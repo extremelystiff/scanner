@@ -252,8 +252,8 @@
             const sessionNumber = sessionCommand.slice(-2);
             currentSessionName.textContent = `S${sessionNumber}`;
             sessionModal.style.display = 'none';
-            // We no longer send the command here to prevent the initial double-send.
-            // It will be sent automatically with the next action.
+            // Send the session command immediately upon selection
+            sendSequence([currentSession]);
         }
 
         document.querySelectorAll('.session-btn').forEach(button => {
