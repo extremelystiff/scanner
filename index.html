@@ -19,26 +19,25 @@
             overscroll-behavior-y: contain;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
-        /* Style for the scanner viewfinder border */
+        /* --- MODIFIED: More robust scanner view styling --- */
         #reader-container {
             position: relative;
             background: black;
             width: 100%;
-            padding-top: 100%; /* 1:1 Aspect Ratio */
-            border-radius: 0.5rem; /* rounded-lg */
-            overflow: hidden;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); /* shadow-xl */
+            aspect-ratio: 1 / 1; /* Modern CSS for 1:1 Aspect Ratio */
+            border-radius: 0.5rem; 
+            overflow: hidden; /* Crucial: Clips anything trying to render outside */
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
         }
-        /* This is the container for the camera feed */
         #reader {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
         }
-        /* Ensure the video feed fills the container */
+        /* Target the video element injected by the library */
         #reader video {
             width: 100% !important;
             height: 100% !important;
-            object-fit: cover;
+            object-fit: cover; /* Ensures the video fills the container without distortion */
         }
         .scanner-line {
             position: absolute;
@@ -54,11 +53,9 @@
             50% { top: 90%; }
             100% { top: 10%; }
         }
-        /* Custom modal backdrop */
         .modal-backdrop {
             background-color: rgba(0,0,0,0.75);
         }
-        /* Ensure bottom nav doesn't cover content */
         main {
             padding-bottom: 80px;
         }
@@ -69,7 +66,7 @@
     <!-- App Container -->
     <div id="app" class="max-w-md mx-auto h-screen flex flex-col">
 
-        <!-- Header: Connection Status -->
+        <!-- Header -->
         <header class="p-3 bg-white shadow-md z-20">
             <h1 class="text-xl font-bold text-center">Prize Scanner</h1>
             <button id="connectButton" class="w-full mt-2 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 disabled:bg-gray-400">
@@ -78,14 +75,14 @@
             <div id="bleStatus" class="text-center text-sm text-gray-500 mt-1">Status: Disconnected</div>
         </header>
 
-        <!-- Main Content: Scanner View -->
+        <!-- Main Content -->
         <main class="flex-grow p-4">
             <div id="reader-container">
                 <div id="reader"></div>
                 <div class="scanner-line"></div>
             </div>
             <div id="scanResult" class="mt-4 p-3 bg-white rounded-lg text-center font-mono break-words">
-                Awaiting scan...
+                Hold Scan Button to Scan
             </div>
         </main>
         
@@ -105,17 +102,15 @@
             </button>
         </footer>
 
-        <!-- Session Indicator Bar (Top) -->
+        <!-- Session Indicator Bar -->
         <div id="sessionIndicator" class="fixed top-0 left-0 right-0 bg-yellow-400 text-black p-1 text-center text-sm font-bold flex justify-between items-center z-30 max-w-md mx-auto">
             <button id="closeSessionButton" class="bg-red-500 text-white text-xs font-bold py-1 px-2 rounded">CLOSE</button>
             <span>Session: <span id="currentSessionName">None</span></span>
             <button id="changeSessionButton" class="bg-blue-500 text-white text-xs font-bold py-1 px-2 rounded">Change</button>
         </div>
-
     </div>
 
     <!-- Modals -->
-    <!-- Session Selection Modal -->
     <div id="sessionModal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-40">
         <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12">
             <h2 class="text-2xl font-bold mb-4 text-center">Select a Session</h2>
@@ -130,7 +125,6 @@
         </div>
     </div>
 
-    <!-- Multiplier Modal -->
     <div id="multiplierModal" class="fixed inset-0 modal-backdrop items-center justify-center z-40 hidden">
         <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12">
             <h2 class="text-2xl font-bold mb-4 text-center">Set Quantity</h2>
@@ -142,7 +136,6 @@
         </div>
     </div>
 
-
     <script>
         // --- GLOBAL STATE & CONSTANTS ---
         let currentSession = null;
@@ -150,9 +143,9 @@
         let html5QrCode = null;
         let isScannerRunning = false;
         let commandCharacteristic = null;
-        let audioContext; // For beep sound
+        let audioContext;
+        let isScanCooldown = false; // --- NEW: Cooldown flag ---
 
-        // IMPORTANT: These UUIDs must EXACTLY match your ESP32 firmware
         const SERVICE_UUID = "0000180a-0000-1000-8000-00805f9b34fb";
         const COMMAND_CHARACTERISTIC_UUID = "00002a57-0000-1000-8000-00805f9b34fb";
         const STATUS_CHARACTERISTIC_UUID = "00002a58-0000-1000-8000-00805f9b34fb";
@@ -167,7 +160,7 @@
         const multiplierLabel = document.getElementById('multiplierLabel');
         const scanButton = document.getElementById('scanButton');
 
-        // --- NEW: FEEDBACK FUNCTIONS ---
+        // --- FEEDBACK FUNCTIONS ---
         function playBeep() {
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -176,29 +169,24 @@
             const gainNode = audioContext.createGain();
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-            
             oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
+            oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
             gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
-
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.2);
         }
 
         function vibrate() {
             if ('vibrate' in navigator) {
-                navigator.vibrate(200); // Vibrate for 200ms
+                navigator.vibrate(200);
             }
         }
 
-        // --- CORE LOGIC: BLE (WEB BLUETOOTH) ---
-        
-        // 1. Send a command to the ESP32
+        // --- CORE LOGIC: BLE ---
         async function sendBleCommand(command) {
             if (!commandCharacteristic) {
                 bleStatus.textContent = 'Scanner is disconnected.';
-                console.error("Not connected to BLE device.");
                 return false;
             }
             try {
@@ -213,24 +201,22 @@
             }
         }
 
-        // 2. Send a sequence of commands with delays
         async function sendSequence(commands) {
             bleStatus.textContent = `Processing ${commands.length} commands...`;
             for (const command of commands) {
                 const success = await sendBleCommand(command);
                 if (!success) {
                     bleStatus.textContent = `Failed on command: ${command}`;
-                    return; // Stop sequence on failure
+                    return;
                 }
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
             bleStatus.textContent = 'Sequence sent successfully!';
         }
 
-        // 3. Connect to the ESP32
         connectButton.addEventListener('click', async () => {
             if (!navigator.bluetooth) {
-                alert('Web Bluetooth API is not available on this browser.');
+                alert('Web Bluetooth API is not available.');
                 return;
             }
             try {
@@ -239,26 +225,19 @@
                     filters: [{ services: [SERVICE_UUID] }],
                     optionalServices: [SERVICE_UUID]
                 });
-                
                 device.addEventListener('gattserverdisconnected', onDisconnected);
-                
-                bleStatus.textContent = "Connecting to GATT Server...";
+                bleStatus.textContent = "Connecting...";
                 const server = await device.gatt.connect();
-                
                 bleStatus.textContent = "Getting Service...";
                 const service = await server.getPrimaryService(SERVICE_UUID);
-                
                 bleStatus.textContent = "Getting Characteristics...";
                 commandCharacteristic = await service.getCharacteristic(COMMAND_CHARACTERISTIC_UUID);
-                
                 const statusCharacteristic = await service.getCharacteristic(STATUS_CHARACTERISTIC_UUID);
                 await statusCharacteristic.startNotifications();
                 statusCharacteristic.addEventListener('characteristicvaluechanged', handleStatusUpdate);
-                
                 connectButton.disabled = true;
                 connectButton.textContent = 'Connected';
                 bleStatus.textContent = '✅ Ready to Scan';
-                // Do not start scanner automatically
             } catch (error) {
                 bleStatus.textContent = `Connection Failed: ${error.message}`;
                 console.error(error);
@@ -280,13 +259,13 @@
             bleStatus.textContent = `ESP32: ${statusMessage}`;
         }
 
-
         // --- CORE LOGIC: SESSION MANAGEMENT ---
         function setSession(sessionCommand) {
             currentSession = sessionCommand;
             const sessionNumber = sessionCommand.slice(-2);
             currentSessionName.textContent = `S${sessionNumber}`;
             sessionModal.style.display = 'none';
+            // --- FIXED: Only send session command on selection ---
             sendSequence([currentSession]);
         }
 
@@ -306,18 +285,22 @@
             sendSequence(['CLOSE SESSION']);
         });
 
-        
         // --- CORE LOGIC: CAMERA BARCODE SCANNER ---
         const onScanSuccess = (decodedText, decodedResult) => {
-            // --- MODIFIED: Stop scanner immediately and give feedback ---
-            stopScanner();
+            // --- MODIFIED: Implement cooldown to prevent rapid-fire scans ---
+            if (isScanCooldown) {
+                return; // Ignore scan if in cooldown period
+            }
+            
+            isScanCooldown = true; // Start cooldown
+            
             playBeep();
             vibrate();
 
             scanResult.textContent = `Scanned: ${decodedText}`;
             
-            // Build the command sequence
-            let commands = [currentSession];
+            // --- FIXED: Do NOT resend session command with every scan ---
+            let commands = [];
             if (currentMultiplier > 1) {
                 commands.push(currentMultiplier.toString());
             }
@@ -325,19 +308,22 @@
             
             sendSequence(commands);
             
-            // Reset multiplier after a successful scan
             currentMultiplier = 1;
             multiplierLabel.textContent = "Qty: 1";
+
+            // End the cooldown period after 2 seconds
+            setTimeout(() => {
+                isScanCooldown = false;
+                if (isScannerRunning) { // Only update text if scanner is still active
+                    scanResult.textContent = "Scanning...";
+                }
+            }, 2000);
         };
 
-        const onScanFailure = (error) => {
-            // This is called frequently, so keep it quiet unless debugging.
-            // console.warn(`Code scan error = ${error}`);
-        };
+        const onScanFailure = (error) => { /* Keep this quiet */ };
         
         function startScanner() {
             if (isScannerRunning || !html5QrCode) return;
-            
             if (!currentSession) {
                 alert("Please select a session before scanning.");
                 sessionModal.style.display = 'flex';
@@ -345,10 +331,8 @@
             }
 
             isScannerRunning = true;
-            scanButton.disabled = true;
-            scanResult.textContent = "Scanning..."; // Give user feedback
             scanButton.classList.add('text-green-400');
-
+            scanResult.textContent = "Scanning...";
             html5QrCode.start(
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 250 } },
@@ -357,7 +341,6 @@
             ).catch(err => {
                 console.error("Failed to start scanner", err);
                 isScannerRunning = false;
-                scanButton.disabled = false;
                 scanButton.classList.remove('text-green-400');
                 scanResult.textContent = "Error starting camera.";
             });
@@ -365,38 +348,34 @@
         
         function stopScanner() {
             if (!isScannerRunning || !html5QrCode) return;
-            // Check if the camera is actually streaming before trying to stop
-            if (html5QrCode.getState() === Html5Qrcode.SCANNING) {
+            if (html5QrCode.getState() === 2) { // 2 = Html5Qrcode.SCANNING
                 html5QrCode.stop().then(() => {
-                    isScannerRunning = false;
-                    scanButton.disabled = false;
-                    scanButton.classList.remove('text-green-400');
                     console.log("QR Code scanning stopped.");
-                    scanResult.textContent = "Awaiting scan...";
                 }).catch(err => {
                     console.error("Failed to stop scanner cleanly", err);
-                    // Force state change even if there's an error
+                }).finally(() => {
                     isScannerRunning = false;
-                    scanButton.disabled = false;
+                    scanButton.classList.remove('text-green-400');
+                    scanResult.textContent = "Hold Scan Button to Scan";
                 });
             } else {
-                isScannerRunning = false;
-                scanButton.disabled = false;
-                scanButton.classList.remove('text-green-400');
+                 isScannerRunning = false;
+                 scanButton.classList.remove('text-green-400');
+                 scanResult.textContent = "Hold Scan Button to Scan";
             }
         }
         
-        // --- MODIFIED: Scan button only starts the scan ---
-        scanButton.addEventListener('click', () => {
-            if (!isScannerRunning) {
-                startScanner();
-            }
+        // --- MODIFIED: Implement Hold-to-Scan logic ---
+        scanButton.addEventListener('mousedown', startScanner);
+        scanButton.addEventListener('mouseup', stopScanner);
+        scanButton.addEventListener('mouseleave', stopScanner); // Stop if mouse leaves button
+        scanButton.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent click events from firing too
+            startScanner();
         });
+        scanButton.addEventListener('touchend', stopScanner);
 
-
-        // --- CORE LOGIC: OTHER UI ACTIONS ---
-
-        // Redemption Button
+        // --- OTHER UI ACTIONS ---
         document.getElementById('redeemButton').addEventListener('click', () => {
             if (!currentSession) {
                 alert('Please select a session before redeeming.');
@@ -405,7 +384,6 @@
             sendSequence([currentSession, 'REDEMPTION']);
         });
 
-        // Multiplier Modal
         document.getElementById('multiplierButton').addEventListener('click', () => {
             multiplierModal.style.display = 'flex';
         });
@@ -416,21 +394,16 @@
 
         document.getElementById('confirmMultiplier').addEventListener('click', () => {
             const value = parseInt(document.getElementById('multiplierInput').value, 10);
-            currentMultiplier = Math.max(1, value); // Ensure it's at least 1
+            currentMultiplier = Math.max(1, value);
             multiplierLabel.textContent = `Qty: ${currentMultiplier}`;
             multiplierModal.style.display = 'none';
         });
 
-
         // --- INITIALIZATION ---
         window.addEventListener('DOMContentLoaded', () => {
-            // Show session selection on startup
             sessionModal.style.display = 'flex';
-            
-            // Initialize the scanner library
             html5QrCode = new Html5Qrcode("reader");
 
-            // Register Service Worker for offline capability
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('/service-worker.js')
                     .then(() => console.log('Service Worker Registered'))
