@@ -139,6 +139,7 @@
         let html5QrCode = null;
         let isScannerRunning = false;
         let commandCharacteristic = null;
+        let isScanCooldown = false;
 
         // IMPORTANT: These UUIDs must EXACTLY match your ESP32 firmware
         const SERVICE_UUID = "0000180a-0000-1000-8000-00805f9b34fb";
@@ -251,8 +252,8 @@
             const sessionNumber = sessionCommand.slice(-2);
             currentSessionName.textContent = `S${sessionNumber}`;
             sessionModal.style.display = 'none';
-            // Send the session command immediately upon selection
-            sendSequence([currentSession]);
+            // We no longer send the command here to prevent the initial double-send.
+            // It will be sent automatically with the next action.
         }
 
         document.querySelectorAll('.session-btn').forEach(button => {
@@ -274,6 +275,11 @@
         
         // --- CORE LOGIC: CAMERA BARCODE SCANNER ---
         const onScanSuccess = (decodedText, decodedResult) => {
+            // If we are in the cooldown period, ignore the scan
+            if (isScanCooldown) {
+                return;
+            }
+
             if (!currentSession) {
                 alert("Please select a session before scanning.");
                 stopScanner();
@@ -281,6 +287,8 @@
                 return;
             }
 
+            // Start the cooldown period
+            isScanCooldown = true;
             scanResult.textContent = `Scanned: ${decodedText}`;
             
             // Build the command sequence
@@ -295,6 +303,12 @@
             // Reset multiplier after a successful scan
             currentMultiplier = 1;
             multiplierLabel.textContent = "Qty: 1";
+
+            // End the cooldown period after 3 seconds
+            setTimeout(() => {
+                isScanCooldown = false;
+                scanResult.textContent = "Awaiting scan...";
+            }, 3000);
         };
 
         const onScanFailure = (error) => {
