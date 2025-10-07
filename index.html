@@ -19,7 +19,7 @@
             overscroll-behavior-y: contain;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
-        /* --- MODIFIED: More robust scanner view styling --- */
+        /* More robust scanner view styling */
         #reader-container {
             position: relative;
             background: black;
@@ -144,7 +144,7 @@
         let isScannerRunning = false;
         let commandCharacteristic = null;
         let audioContext;
-        let isScanCooldown = false; // --- NEW: Cooldown flag ---
+        let isScanCooldown = false;
 
         const SERVICE_UUID = "0000180a-0000-1000-8000-00805f9b34fb";
         const COMMAND_CHARACTERISTIC_UUID = "00002a57-0000-1000-8000-00805f9b34fb";
@@ -265,7 +265,7 @@
             const sessionNumber = sessionCommand.slice(-2);
             currentSessionName.textContent = `S${sessionNumber}`;
             sessionModal.style.display = 'none';
-            // --- FIXED: Only send session command on selection ---
+            // Send the session command immediately upon selection to "open" it
             sendSequence([currentSession]);
         }
 
@@ -287,20 +287,19 @@
 
         // --- CORE LOGIC: CAMERA BARCODE SCANNER ---
         const onScanSuccess = (decodedText, decodedResult) => {
-            // --- MODIFIED: Implement cooldown to prevent rapid-fire scans ---
             if (isScanCooldown) {
                 return; // Ignore scan if in cooldown period
             }
-            
-            isScanCooldown = true; // Start cooldown
+            isScanCooldown = true;
             
             playBeep();
             vibrate();
 
             scanResult.textContent = `Scanned: ${decodedText}`;
             
-            // --- FIXED: Do NOT resend session command with every scan ---
-            let commands = [];
+            // --- FIXED: Build the correct command sequence for each scan ---
+            // The sequence is [SESSION, (optional) MULTIPLIER, BARCODE]
+            let commands = [currentSession]; 
             if (currentMultiplier > 1) {
                 commands.push(currentMultiplier.toString());
             }
@@ -314,7 +313,7 @@
             // End the cooldown period after 2 seconds
             setTimeout(() => {
                 isScanCooldown = false;
-                if (isScannerRunning) { // Only update text if scanner is still active
+                if (isScannerRunning) {
                     scanResult.textContent = "Scanning...";
                 }
             }, 2000);
@@ -365,12 +364,12 @@
             }
         }
         
-        // --- MODIFIED: Implement Hold-to-Scan logic ---
+        // Hold-to-Scan logic
         scanButton.addEventListener('mousedown', startScanner);
         scanButton.addEventListener('mouseup', stopScanner);
-        scanButton.addEventListener('mouseleave', stopScanner); // Stop if mouse leaves button
+        scanButton.addEventListener('mouseleave', stopScanner);
         scanButton.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Prevent click events from firing too
+            e.preventDefault();
             startScanner();
         });
         scanButton.addEventListener('touchend', stopScanner);
@@ -381,6 +380,7 @@
                 alert('Please select a session before redeeming.');
                 return;
             }
+            // Also send session with redemption command
             sendSequence([currentSession, 'REDEMPTION']);
         });
 
