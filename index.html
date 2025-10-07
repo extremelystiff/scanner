@@ -23,11 +23,22 @@
         #reader-container {
             position: relative;
             background: black;
+            width: 100%;
             padding-top: 100%; /* 1:1 Aspect Ratio */
+            border-radius: 0.5rem; /* rounded-lg */
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); /* shadow-xl */
         }
+        /* This is the container for the camera feed */
         #reader {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
+        }
+        /* Ensure the video feed fills the container */
+        #reader video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover;
         }
         .scanner-line {
             position: absolute;
@@ -69,7 +80,7 @@
 
         <!-- Main Content: Scanner View -->
         <main class="flex-grow p-4">
-            <div id="reader-container" class="w-full rounded-lg shadow-xl overflow-hidden">
+            <div id="reader-container">
                 <div id="reader"></div>
                 <div class="scanner-line"></div>
             </div>
@@ -139,7 +150,7 @@
         let html5QrCode = null;
         let isScannerRunning = false;
         let commandCharacteristic = null;
-        let isScanCooldown = false;
+        let audioContext; // For beep sound
 
         // IMPORTANT: These UUIDs must EXACTLY match your ESP32 firmware
         const SERVICE_UUID = "0000180a-0000-1000-8000-00805f9b34fb";
@@ -156,6 +167,30 @@
         const multiplierLabel = document.getElementById('multiplierLabel');
         const scanButton = document.getElementById('scanButton');
 
+        // --- NEW: FEEDBACK FUNCTIONS ---
+        function playBeep() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        }
+
+        function vibrate() {
+            if ('vibrate' in navigator) {
+                navigator.vibrate(200); // Vibrate for 200ms
+            }
+        }
 
         // --- CORE LOGIC: BLE (WEB BLUETOOTH) ---
         
@@ -187,7 +222,6 @@
                     bleStatus.textContent = `Failed on command: ${command}`;
                     return; // Stop sequence on failure
                 }
-                // Wait a short time between commands for the scanner system to keep up
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
             bleStatus.textContent = 'Sequence sent successfully!';
@@ -224,8 +258,7 @@
                 connectButton.disabled = true;
                 connectButton.textContent = 'Connected';
                 bleStatus.textContent = '✅ Ready to Scan';
-                startScanner();
-
+                // Do not start scanner automatically
             } catch (error) {
                 bleStatus.textContent = `Connection Failed: ${error.message}`;
                 console.error(error);
@@ -237,7 +270,9 @@
             connectButton.disabled = false;
             connectButton.textContent = 'Connect to Scanner';
             commandCharacteristic = null;
-            stopScanner();
+            if (isScannerRunning) {
+                stopScanner();
+            }
         }
 
         function handleStatusUpdate(event) {
@@ -252,7 +287,6 @@
             const sessionNumber = sessionCommand.slice(-2);
             currentSessionName.textContent = `S${sessionNumber}`;
             sessionModal.style.display = 'none';
-            // Send the session command immediately upon selection
             sendSequence([currentSession]);
         }
 
@@ -275,20 +309,11 @@
         
         // --- CORE LOGIC: CAMERA BARCODE SCANNER ---
         const onScanSuccess = (decodedText, decodedResult) => {
-            // If we are in the cooldown period, ignore the scan
-            if (isScanCooldown) {
-                return;
-            }
+            // --- MODIFIED: Stop scanner immediately and give feedback ---
+            stopScanner();
+            playBeep();
+            vibrate();
 
-            if (!currentSession) {
-                alert("Please select a session before scanning.");
-                stopScanner();
-                sessionModal.style.display = 'flex';
-                return;
-            }
-
-            // Start the cooldown period
-            isScanCooldown = true;
             scanResult.textContent = `Scanned: ${decodedText}`;
             
             // Build the command sequence
@@ -303,23 +328,27 @@
             // Reset multiplier after a successful scan
             currentMultiplier = 1;
             multiplierLabel.textContent = "Qty: 1";
-
-            // End the cooldown period after 3 seconds
-            setTimeout(() => {
-                isScanCooldown = false;
-                scanResult.textContent = "Awaiting scan...";
-            }, 3000);
         };
 
         const onScanFailure = (error) => {
+            // This is called frequently, so keep it quiet unless debugging.
             // console.warn(`Code scan error = ${error}`);
         };
         
         function startScanner() {
             if (isScannerRunning || !html5QrCode) return;
+            
+            if (!currentSession) {
+                alert("Please select a session before scanning.");
+                sessionModal.style.display = 'flex';
+                return;
+            }
+
             isScannerRunning = true;
             scanButton.disabled = true;
+            scanResult.textContent = "Scanning..."; // Give user feedback
             scanButton.classList.add('text-green-400');
+
             html5QrCode.start(
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 250 } },
@@ -329,25 +358,37 @@
                 console.error("Failed to start scanner", err);
                 isScannerRunning = false;
                 scanButton.disabled = false;
+                scanButton.classList.remove('text-green-400');
+                scanResult.textContent = "Error starting camera.";
             });
         }
         
         function stopScanner() {
             if (!isScannerRunning || !html5QrCode) return;
-            html5QrCode.stop().then(() => {
+            // Check if the camera is actually streaming before trying to stop
+            if (html5QrCode.getState() === Html5Qrcode.SCANNING) {
+                html5QrCode.stop().then(() => {
+                    isScannerRunning = false;
+                    scanButton.disabled = false;
+                    scanButton.classList.remove('text-green-400');
+                    console.log("QR Code scanning stopped.");
+                    scanResult.textContent = "Awaiting scan...";
+                }).catch(err => {
+                    console.error("Failed to stop scanner cleanly", err);
+                    // Force state change even if there's an error
+                    isScannerRunning = false;
+                    scanButton.disabled = false;
+                });
+            } else {
                 isScannerRunning = false;
                 scanButton.disabled = false;
                 scanButton.classList.remove('text-green-400');
-                console.log("QR Code scanning stopped.");
-            }).catch(err => {
-                console.error("Failed to stop scanner", err);
-            });
+            }
         }
         
+        // --- MODIFIED: Scan button only starts the scan ---
         scanButton.addEventListener('click', () => {
-            if (isScannerRunning) {
-                stopScanner();
-            } else {
+            if (!isScannerRunning) {
                 startScanner();
             }
         });
