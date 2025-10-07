@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Prize Scanner</title>
+    
+    <!-- PWA Manifest and Theme Color -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4A5568"/>
+
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <style>
+        /* Prevents pull-to-refresh and other annoying mobile browser behaviors */
+        body {
+            overscroll-behavior-y: contain;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        /* Style for the scanner viewfinder border */
+        #reader-container {
+            position: relative;
+            background: black;
+            padding-top: 100%; /* 1:1 Aspect Ratio */
+        }
+        #reader {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+        .scanner-line {
+            position: absolute;
+            left: 5%;
+            right: 5%;
+            height: 2px;
+            background: red;
+            box-shadow: 0 0 10px red;
+            animation: scan 2s infinite linear;
+        }
+        @keyframes scan {
+            0% { top: 10%; }
+            50% { top: 90%; }
+            100% { top: 10%; }
+        }
+        /* Custom modal backdrop */
+        .modal-backdrop {
+            background-color: rgba(0,0,0,0.75);
+        }
+        /* Ensure bottom nav doesn't cover content */
+        main {
+            padding-bottom: 80px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- App Container -->
+    <div id="app" class="max-w-md mx-auto h-screen flex flex-col">
+
+        <!-- Header: Connection Status -->
+        <header class="p-3 bg-white shadow-md z-20">
+            <h1 class="text-xl font-bold text-center">Prize Scanner</h1>
+            <button id="connectButton" class="w-full mt-2 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 disabled:bg-gray-400">
+                Connect to Scanner
+            </button>
+            <div id="bleStatus" class="text-center text-sm text-gray-500 mt-1">Status: Disconnected</div>
+        </header>
+
+        <!-- Main Content: Scanner View -->
+        <main class="flex-grow p-4">
+            <div id="reader-container" class="w-full rounded-lg shadow-xl overflow-hidden">
+                <div id="reader"></div>
+                <div class="scanner-line"></div>
+            </div>
+            <div id="scanResult" class="mt-4 p-3 bg-white rounded-lg text-center font-mono break-words">
+                Awaiting scan...
+            </div>
+        </main>
+        
+        <!-- Bottom Navigation Bar -->
+        <footer class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-800 text-white p-2 flex justify-around items-center shadow-lg z-20">
+            <button id="scanButton" class="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-700 disabled:opacity-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                <span class="text-xs">Scan</span>
+            </button>
+            <button id="multiplierButton" class="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+                <span id="multiplierLabel" class="text-xs">Qty: 1</span>
+            </button>
+            <button id="redeemButton" class="flex flex-col items-center justify-center p-2 rounded-lg bg-green-500 hover:bg-green-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                <span class="text-xs">Redeem</span>
+            </button>
+        </footer>
+
+        <!-- Session Indicator Bar (Top) -->
+        <div id="sessionIndicator" class="fixed top-0 left-0 right-0 bg-yellow-400 text-black p-1 text-center text-sm font-bold flex justify-between items-center z-30 max-w-md mx-auto">
+            <button id="closeSessionButton" class="bg-red-500 text-white text-xs font-bold py-1 px-2 rounded">CLOSE</button>
+            <span>Session: <span id="currentSessionName">None</span></span>
+            <button id="changeSessionButton" class="bg-blue-500 text-white text-xs font-bold py-1 px-2 rounded">Change</button>
+        </div>
+
+    </div>
+
+    <!-- Modals -->
+    <!-- Session Selection Modal -->
+    <div id="sessionModal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-40">
+        <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12">
+            <h2 class="text-2xl font-bold mb-4 text-center">Select a Session</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION01">Session 1</button>
+                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION02">Session 2</button>
+                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION03">Session 3</button>
+                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION04">Session 4</button>
+                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION05">Session 5</button>
+                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION06">Session 6</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multiplier Modal -->
+    <div id="multiplierModal" class="fixed inset-0 modal-backdrop items-center justify-center z-40 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12">
+            <h2 class="text-2xl font-bold mb-4 text-center">Set Quantity</h2>
+            <input type="number" id="multiplierInput" class="w-full text-4xl text-center p-2 border-2 rounded-lg mb-4" value="1" min="1" max="99">
+            <div class="flex gap-4">
+                <button id="cancelMultiplier" class="w-full py-2 bg-gray-500 text-white font-bold rounded-lg hover:bg-gray-600">Cancel</button>
+                <button id="confirmMultiplier" class="w-full py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- GLOBAL STATE & CONSTANTS ---
+        let currentSession = null;
+        let currentMultiplier = 1;
+        let html5QrCode = null;
+        let isScannerRunning = false;
+        let commandCharacteristic = null;
+
+        // IMPORTANT: These UUIDs must EXACTLY match your ESP32 firmware
+        const SERVICE_UUID = "0000180a-0000-1000-8000-00805f9b34fb";
+        const COMMAND_CHARACTERISTIC_UUID = "00002a57-0000-1000-8000-00805f9b34fb";
+        const STATUS_CHARACTERISTIC_UUID = "00002a58-0000-1000-8000-00805f9b34fb";
+        
+        // --- DOM ELEMENT REFERENCES ---
+        const connectButton = document.getElementById('connectButton');
+        const bleStatus = document.getElementById('bleStatus');
+        const sessionModal = document.getElementById('sessionModal');
+        const multiplierModal = document.getElementById('multiplierModal');
+        const currentSessionName = document.getElementById('currentSessionName');
+        const scanResult = document.getElementById('scanResult');
+        const multiplierLabel = document.getElementById('multiplierLabel');
+        const scanButton = document.getElementById('scanButton');
+
+
+        // --- CORE LOGIC: BLE (WEB BLUETOOTH) ---
+        
+        // 1. Send a command to the ESP32
+        async function sendBleCommand(command) {
+            if (!commandCharacteristic) {
+                bleStatus.textContent = 'Scanner is disconnected.';
+                console.error("Not connected to BLE device.");
+                return false;
+            }
+            try {
+                const encoder = new TextEncoder();
+                await commandCharacteristic.writeValue(encoder.encode(command));
+                console.log(`Sent: ${command}`);
+                return true;
+            } catch (error) {
+                console.error(`Send Error for command "${command}":`, error);
+                bleStatus.textContent = `Send Error: ${error.message}`;
+                return false;
+            }
+        }
+
+        // 2. Send a sequence of commands with delays
+        async function sendSequence(commands) {
+            bleStatus.textContent = `Processing ${commands.length} commands...`;
+            for (const command of commands) {
+                const success = await sendBleCommand(command);
+                if (!success) {
+                    bleStatus.textContent = `Failed on command: ${command}`;
+                    return; // Stop sequence on failure
+                }
+                // Wait a short time between commands for the scanner system to keep up
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            bleStatus.textContent = 'Sequence sent successfully!';
+        }
+
+        // 3. Connect to the ESP32
+        connectButton.addEventListener('click', async () => {
+            if (!navigator.bluetooth) {
+                alert('Web Bluetooth API is not available on this browser.');
+                return;
+            }
+            try {
+                bleStatus.textContent = "Requesting device...";
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [SERVICE_UUID] }],
+                    optionalServices: [SERVICE_UUID]
+                });
+                
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+                
+                bleStatus.textContent = "Connecting to GATT Server...";
+                const server = await device.gatt.connect();
+                
+                bleStatus.textContent = "Getting Service...";
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                
+                bleStatus.textContent = "Getting Characteristics...";
+                commandCharacteristic = await service.getCharacteristic(COMMAND_CHARACTERISTIC_UUID);
+                
+                const statusCharacteristic = await service.getCharacteristic(STATUS_CHARACTERISTIC_UUID);
+                await statusCharacteristic.startNotifications();
+                statusCharacteristic.addEventListener('characteristicvaluechanged', handleStatusUpdate);
+                
+                connectButton.disabled = true;
+                connectButton.textContent = 'Connected';
+                bleStatus.textContent = '✅ Ready to Scan';
+                startScanner();
+
+            } catch (error) {
+                bleStatus.textContent = `Connection Failed: ${error.message}`;
+                console.error(error);
+            }
+        });
+
+        function onDisconnected() {
+            bleStatus.textContent = 'Disconnected. Please reconnect.';
+            connectButton.disabled = false;
+            connectButton.textContent = 'Connect to Scanner';
+            commandCharacteristic = null;
+            stopScanner();
+        }
+
+        function handleStatusUpdate(event) {
+            const statusMessage = new TextDecoder().decode(event.target.value);
+            bleStatus.textContent = `ESP32: ${statusMessage}`;
+        }
+
+
+        // --- CORE LOGIC: SESSION MANAGEMENT ---
+        function setSession(sessionCommand) {
+            currentSession = sessionCommand;
+            const sessionNumber = sessionCommand.slice(-2);
+            currentSessionName.textContent = `S${sessionNumber}`;
+            sessionModal.style.display = 'none';
+            // Send the session command immediately upon selection
+            sendSequence([currentSession]);
+        }
+
+        document.querySelectorAll('.session-btn').forEach(button => {
+            button.addEventListener('click', () => setSession(button.dataset.session));
+        });
+
+        document.getElementById('changeSessionButton').addEventListener('click', () => {
+            sessionModal.style.display = 'flex';
+        });
+
+        document.getElementById('closeSessionButton').addEventListener('click', () => {
+            if (!currentSession) {
+                alert('No session is active.');
+                return;
+            }
+            sendSequence(['CLOSE SESSION']);
+        });
+
+        
+        // --- CORE LOGIC: CAMERA BARCODE SCANNER ---
+        const onScanSuccess = (decodedText, decodedResult) => {
+            if (!currentSession) {
+                alert("Please select a session before scanning.");
+                stopScanner();
+                sessionModal.style.display = 'flex';
+                return;
+            }
+
+            scanResult.textContent = `Scanned: ${decodedText}`;
+            
+            // Build the command sequence
+            let commands = [currentSession];
+            if (currentMultiplier > 1) {
+                commands.push(currentMultiplier.toString());
+            }
+            commands.push(decodedText);
+            
+            sendSequence(commands);
+            
+            // Reset multiplier after a successful scan
+            currentMultiplier = 1;
+            multiplierLabel.textContent = "Qty: 1";
+        };
+
+        const onScanFailure = (error) => {
+            // console.warn(`Code scan error = ${error}`);
+        };
+        
+        function startScanner() {
+            if (isScannerRunning || !html5QrCode) return;
+            isScannerRunning = true;
+            scanButton.disabled = true;
+            scanButton.classList.add('text-green-400');
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                onScanSuccess,
+                onScanFailure
+            ).catch(err => {
+                console.error("Failed to start scanner", err);
+                isScannerRunning = false;
+                scanButton.disabled = false;
+            });
+        }
+        
+        function stopScanner() {
+            if (!isScannerRunning || !html5QrCode) return;
+            html5QrCode.stop().then(() => {
+                isScannerRunning = false;
+                scanButton.disabled = false;
+                scanButton.classList.remove('text-green-400');
+                console.log("QR Code scanning stopped.");
+            }).catch(err => {
+                console.error("Failed to stop scanner", err);
+            });
+        }
+        
+        scanButton.addEventListener('click', () => {
+            if (isScannerRunning) {
+                stopScanner();
+            } else {
+                startScanner();
+            }
+        });
+
+
+        // --- CORE LOGIC: OTHER UI ACTIONS ---
+
+        // Redemption Button
+        document.getElementById('redeemButton').addEventListener('click', () => {
+            if (!currentSession) {
+                alert('Please select a session before redeeming.');
+                return;
+            }
+            sendSequence([currentSession, 'REDEMPTION']);
+        });
+
+        // Multiplier Modal
+        document.getElementById('multiplierButton').addEventListener('click', () => {
+            multiplierModal.style.display = 'flex';
+        });
+
+        document.getElementById('cancelMultiplier').addEventListener('click', () => {
+            multiplierModal.style.display = 'none';
+        });
+
+        document.getElementById('confirmMultiplier').addEventListener('click', () => {
+            const value = parseInt(document.getElementById('multiplierInput').value, 10);
+            currentMultiplier = Math.max(1, value); // Ensure it's at least 1
+            multiplierLabel.textContent = `Qty: ${currentMultiplier}`;
+            multiplierModal.style.display = 'none';
+        });
+
+
+        // --- INITIALIZATION ---
+        window.addEventListener('DOMContentLoaded', () => {
+            // Show session selection on startup
+            sessionModal.style.display = 'flex';
+            
+            // Initialize the scanner library
+            html5QrCode = new Html5Qrcode("reader");
+
+            // Register Service Worker for offline capability
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(() => console.log('Service Worker Registered'))
+                    .catch(error => console.error('Service Worker Registration Failed:', error));
+            }
+        });
+    </script>
+</body>
+</html>
