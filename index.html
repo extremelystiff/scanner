@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Prize Scanner</title>
+    <title>Prize Scanner & Inventory</title>
     
     <!-- PWA Manifest and Theme Color -->
     <link rel="manifest" href="manifest.json">
@@ -26,7 +26,7 @@
             width: 100%;
             aspect-ratio: 1 / 1; /* Modern CSS for 1:1 Aspect Ratio */
             border-radius: 0.5rem; 
-            overflow: hidden; /* Crucial: Clips anything trying to render outside */
+            overflow: hidden; /* Clips anything trying to render outside */
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
         }
         #reader {
@@ -56,8 +56,14 @@
         .modal-backdrop {
             background-color: rgba(0,0,0,0.75);
         }
+        /* Make main containers scrollable if content overflows */
         main {
             padding-bottom: 80px;
+            overflow-y: auto;
+        }
+        /* Hide scrollbar for cleaner look */
+        main::-webkit-scrollbar {
+            display: none;
         }
     </style>
 </head>
@@ -66,43 +72,82 @@
     <!-- App Container -->
     <div id="app" class="max-w-md mx-auto h-screen flex flex-col">
 
-        <!-- Header -->
-        <header class="p-3 bg-white shadow-md z-20">
-            <h1 class="text-xl font-bold text-center">Prize Scanner</h1>
-            <button id="connectButton" class="w-full mt-2 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 disabled:bg-gray-400">
-                Connect to Scanner
-            </button>
-            <div id="bleStatus" class="text-center text-sm text-gray-500 mt-1">Status: Disconnected</div>
-        </header>
+        <!-- =================================================================== -->
+        <!-- =================== SCANNER INTERFACE =========================== -->
+        <!-- =================================================================== -->
+        <div id="scannerView" class="flex-grow flex-col hidden">
+            <!-- Header -->
+            <header class="p-3 bg-white shadow-md z-20">
+                <h1 class="text-xl font-bold text-center">Prize Scanner</h1>
+                <button id="connectButton" class="w-full mt-2 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 disabled:bg-gray-400">
+                    Connect to Scanner
+                </button>
+                <div id="bleStatus" class="text-center text-sm text-gray-500 mt-1">Status: Disconnected</div>
+            </header>
 
-        <!-- Main Content -->
-        <main class="flex-grow p-4">
-            <div id="reader-container">
-                <div id="reader"></div>
-                <div class="scanner-line"></div>
-            </div>
-            <div id="scanResult" class="mt-4 p-3 bg-white rounded-lg text-center font-mono break-words">
-                Hold Scan Button to Scan
-            </div>
-        </main>
-        
-        <!-- Bottom Navigation Bar -->
-        <footer class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-800 text-white p-2 flex justify-around items-center shadow-lg z-20">
-            <button id="scanButton" class="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-700 disabled:opacity-50">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                <span class="text-xs">Scan</span>
-            </button>
-            <button id="multiplierButton" class="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
-                <span id="multiplierLabel" class="text-xs">Qty: 1</span>
-            </button>
-            <button id="redeemButton" class="flex flex-col items-center justify-center p-2 rounded-lg bg-green-500 hover:bg-green-600">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                <span class="text-xs">Redeem</span>
-            </button>
-        </footer>
+            <!-- Main Content -->
+            <main class="flex-grow p-4">
+                <div id="reader-container">
+                    <div id="reader"></div>
+                    <div class="scanner-line"></div>
+                </div>
+                <div id="scanResult" class="mt-4 p-3 bg-white rounded-lg text-center font-mono break-words">
+                    Hold Scan Button to Scan
+                </div>
+            </main>
+            
+            <!-- Bottom Navigation Bar -->
+            <footer class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-800 text-white p-2 flex justify-around items-center shadow-lg z-20">
+                <button id="scanButton" class="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-700 disabled:opacity-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <span class="text-xs">Scan</span>
+                </button>
+                <button id="multiplierButton" class="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-700">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                    <span id="multiplierLabel" class="text-xs">Qty: 1</span>
+                </button>
+                <button id="redeemButton" class="flex flex-col items-center justify-center p-2 rounded-lg bg-green-500 hover:bg-green-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                    <span class="text-xs">Redeem</span>
+                </button>
+            </footer>
+        </div>
 
-        <!-- Session Indicator Bar -->
+        <!-- =================================================================== -->
+        <!-- =================== PRODUCT CATALOG SECTION ===================== -->
+        <!-- =================================================================== -->
+        <div id="databaseLoginView" class="p-8 h-full flex flex-col items-center justify-center bg-gray-200">
+            <div class="text-center">
+                <h2 class="text-2xl font-bold mb-4">Product Database</h2>
+                <p class="mb-6 text-gray-600">Scan your database encryption key to load the product catalog.</p>
+                <button id="scanDbKeyButton" class="w-full py-3 px-4 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 focus:outline-none">
+                    Scan Database Key
+                </button>
+                <div id="dbStatus" class="mt-4 text-sm text-red-500 font-semibold"></div>
+            </div>
+        </div>
+
+        <div id="productCatalogView" class="hidden h-full flex-grow flex-col">
+            <!-- Header for Catalog -->
+            <header class="p-3 bg-white shadow-md z-10 flex-shrink-0">
+                <div class="flex gap-2">
+                    <input type="text" id="searchInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Search by name, barcode...">
+                    <button id="addProductButton" class="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                    </button>
+                </div>
+                <div id="categoryFilters" class="mt-2 flex flex-wrap gap-2">
+                    <!-- Category buttons will be injected here -->
+                </div>
+            </header>
+
+            <!-- Product List -->
+            <main id="productList" class="flex-grow p-4 space-y-3 overflow-y-auto">
+                <!-- Product cards will be injected here -->
+            </main>
+        </div>
+
+        <!-- Shared Session Indicator Bar -->
         <div id="sessionIndicator" class="fixed top-0 left-0 right-0 bg-yellow-400 text-black p-1 text-center text-sm font-bold flex justify-between items-center z-30 max-w-md mx-auto">
             <button id="closeSessionButton" class="bg-red-500 text-white text-xs font-bold py-1 px-2 rounded">CLOSE</button>
             <span>Session: <span id="currentSessionName">None</span></span>
@@ -110,7 +155,9 @@
         </div>
     </div>
 
-    <!-- Modals -->
+    <!-- =================================================================== -->
+    <!-- ========================= MODALS ================================== -->
+    <!-- =================================================================== -->
     <div id="sessionModal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-40">
         <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12">
             <h2 class="text-2xl font-bold mb-4 text-center">Select a Session</h2>
@@ -122,6 +169,7 @@
                 <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION05">Session 5</button>
                 <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION06">Session 6</button>
             </div>
+            <button id="showCatalogButton" class="w-full mt-4 py-3 bg-gray-600 text-white font-bold rounded-lg shadow-md hover:bg-gray-700">View Product Catalog</button>
         </div>
     </div>
 
@@ -135,6 +183,52 @@
             </div>
         </div>
     </div>
+    
+    <div id="productModal" class="fixed inset-0 modal-backdrop items-center justify-center z-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12 max-w-lg max-h-screen overflow-y-auto">
+            <h2 id="productModalTitle" class="text-2xl font-bold mb-4">Add New Product</h2>
+            <form id="productForm">
+                <input type="hidden" id="productId">
+                
+                <div class="mb-4">
+                    <label for="productName" class="block text-sm font-medium text-gray-700">Product Name</label>
+                    <input type="text" id="productName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="productBarcode" class="block text-sm font-medium text-gray-700">Barcode / SKU</label>
+                     <div class="flex gap-2">
+                        <input type="text" id="productBarcode" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                        <!-- In a real app, a scan button here would be complex. For now, manual entry. -->
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="productStock" class="block text-sm font-medium text-gray-700">Stock Count</label>
+                    <input type="number" id="productStock" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" value="0" min="0">
+                </div>
+
+                <div class="mb-4">
+                    <label for="productCategory" class="block text-sm font-medium text-gray-700">Category</label>
+                    <input type="text" id="productCategory" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., Electronics, Toys">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="productImage" class="block text-sm font-medium text-gray-700">Product Image</label>
+                    <input type="file" id="productImage" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <img id="imagePreview" src="" class="mt-2 h-32 w-32 object-cover rounded-md hidden">
+                    <input type="hidden" id="imageBase64">
+                </div>
+
+                <div class="flex gap-4 mt-6">
+                    <button type="button" id="cancelProductForm" class="w-full py-2 bg-gray-500 text-white font-bold rounded-lg hover:bg-gray-600">Cancel</button>
+                    <button type="submit" class="w-full py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600">Save Product</button>
+                </div>
+                 <button type="button" id="deleteProductButton" class="w-full mt-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 hidden">Delete Product</button>
+            </form>
+        </div>
+    </div>
+
 
     <script>
         // --- GLOBAL STATE & CONSTANTS ---
@@ -150,7 +244,8 @@
         const COMMAND_CHARACTERISTIC_UUID = "00002a57-0000-1000-8000-00805f9b34fb";
         const STATUS_CHARACTERISTIC_UUID = "00002a58-0000-1000-8000-00805f9b34fb";
         
-        // --- DOM ELEMENT REFERENCES ---
+        // --- SCANNER DOM REFERENCES ---
+        const scannerView = document.getElementById('scannerView');
         const connectButton = document.getElementById('connectButton');
         const bleStatus = document.getElementById('bleStatus');
         const sessionModal = document.getElementById('sessionModal');
@@ -159,6 +254,31 @@
         const scanResult = document.getElementById('scanResult');
         const multiplierLabel = document.getElementById('multiplierLabel');
         const scanButton = document.getElementById('scanButton');
+
+        // --- DATABASE & CATALOG STATE ---
+        let dbConfig = null; // Will store { url, token }
+        let allProducts = [];
+        let allCategories = [];
+        let activeCategory = 'All';
+
+        // --- DATABASE & CATALOG DOM REFERENCES ---
+        const databaseLoginView = document.getElementById('databaseLoginView');
+        const productCatalogView = document.getElementById('productCatalogView');
+        const dbStatus = document.getElementById('dbStatus');
+        const productList = document.getElementById('productList');
+        const categoryFilters = document.getElementById('categoryFilters');
+        const searchInput = document.getElementById('searchInput');
+        const showCatalogButton = document.getElementById('showCatalogButton');
+
+        // Modals and Forms
+        const productModal = document.getElementById('productModal');
+        const productForm = document.getElementById('productForm');
+        const cancelProductForm = document.getElementById('cancelProductForm');
+        const addProductButton = document.getElementById('addProductButton');
+        const deleteProductButton = document.getElementById('deleteProductButton');
+        const imagePreview = document.getElementById('imagePreview');
+        const productImageInput = document.getElementById('productImage');
+        const imageBase64Input = document.getElementById('imageBase64');
 
         // --- FEEDBACK FUNCTIONS ---
         function playBeep() {
@@ -180,6 +300,21 @@
         function vibrate() {
             if ('vibrate' in navigator) {
                 navigator.vibrate(200);
+            }
+        }
+        
+        // --- CORE LOGIC: VIEW MANAGEMENT ---
+        function showView(view) {
+            scannerView.style.display = 'none';
+            databaseLoginView.style.display = 'none';
+            productCatalogView.style.display = 'none';
+
+            if (view === 'scanner') {
+                scannerView.style.display = 'flex';
+            } else if (view === 'login') {
+                databaseLoginView.style.display = 'flex';
+            } else if (view === 'catalog') {
+                productCatalogView.style.display = 'flex';
             }
         }
 
@@ -265,8 +400,8 @@
             const sessionNumber = sessionCommand.slice(-2);
             currentSessionName.textContent = `S${sessionNumber}`;
             sessionModal.style.display = 'none';
-            // Send the session command immediately upon selection to "open" it
-            sendSequence([currentSession]);
+            sendSequence([currentSession]); // Send session command to prime the scanner
+            showView('scanner'); // After selecting a session, show the scanner view
         }
 
         document.querySelectorAll('.session-btn').forEach(button => {
@@ -286,10 +421,8 @@
         });
 
         // --- CORE LOGIC: CAMERA BARCODE SCANNER ---
-        const onScanSuccess = (decodedText, decodedResult) => {
-            if (isScanCooldown) {
-                return; // Ignore scan if in cooldown period
-            }
+        const onPrizeScanSuccess = (decodedText, decodedResult) => {
+            if (isScanCooldown) return;
             isScanCooldown = true;
             
             playBeep();
@@ -297,8 +430,6 @@
 
             scanResult.textContent = `Scanned: ${decodedText}`;
             
-            // --- FIXED: Build the correct command sequence for each scan ---
-            // The sequence is [SESSION, (optional) MULTIPLIER, BARCODE]
             let commands = [currentSession]; 
             if (currentMultiplier > 1) {
                 commands.push(currentMultiplier.toString());
@@ -310,7 +441,6 @@
             currentMultiplier = 1;
             multiplierLabel.textContent = "Qty: 1";
 
-            // End the cooldown period after 2 seconds
             setTimeout(() => {
                 isScanCooldown = false;
                 if (isScannerRunning) {
@@ -318,8 +448,6 @@
                 }
             }, 2000);
         };
-
-        const onScanFailure = (error) => { /* Keep this quiet */ };
         
         function startScanner() {
             if (isScannerRunning || !html5QrCode) return;
@@ -335,8 +463,8 @@
             html5QrCode.start(
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 250 } },
-                onScanSuccess,
-                onScanFailure
+                onPrizeScanSuccess,
+                (error) => { /* quiet failure */ }
             ).catch(err => {
                 console.error("Failed to start scanner", err);
                 isScannerRunning = false;
@@ -346,32 +474,18 @@
         }
         
         function stopScanner() {
-            if (!isScannerRunning || !html5QrCode) return;
-            if (html5QrCode.getState() === 2) { // 2 = Html5Qrcode.SCANNING
-                html5QrCode.stop().then(() => {
-                    console.log("QR Code scanning stopped.");
-                }).catch(err => {
-                    console.error("Failed to stop scanner cleanly", err);
-                }).finally(() => {
-                    isScannerRunning = false;
-                    scanButton.classList.remove('text-green-400');
-                    scanResult.textContent = "Hold Scan Button to Scan";
-                });
-            } else {
-                 isScannerRunning = false;
-                 scanButton.classList.remove('text-green-400');
-                 scanResult.textContent = "Hold Scan Button to Scan";
-            }
+            if (!isScannerRunning || !html5QrCode || html5QrCode.getState() !== 2) return;
+            html5QrCode.stop().finally(() => {
+                isScannerRunning = false;
+                scanButton.classList.remove('text-green-400');
+                scanResult.textContent = "Hold Scan Button to Scan";
+            });
         }
         
-        // Hold-to-Scan logic
         scanButton.addEventListener('mousedown', startScanner);
         scanButton.addEventListener('mouseup', stopScanner);
         scanButton.addEventListener('mouseleave', stopScanner);
-        scanButton.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startScanner();
-        });
+        scanButton.addEventListener('touchstart', (e) => { e.preventDefault(); startScanner(); });
         scanButton.addEventListener('touchend', stopScanner);
 
         // --- OTHER UI ACTIONS ---
@@ -380,18 +494,11 @@
                 alert('Please select a session before redeeming.');
                 return;
             }
-            // Also send session with redemption command
             sendSequence([currentSession, 'REDEMPTION']);
         });
 
-        document.getElementById('multiplierButton').addEventListener('click', () => {
-            multiplierModal.style.display = 'flex';
-        });
-
-        document.getElementById('cancelMultiplier').addEventListener('click', () => {
-            multiplierModal.style.display = 'none';
-        });
-
+        document.getElementById('multiplierButton').addEventListener('click', () => { multiplierModal.style.display = 'flex'; });
+        document.getElementById('cancelMultiplier').addEventListener('click', () => { multiplierModal.style.display = 'none'; });
         document.getElementById('confirmMultiplier').addEventListener('click', () => {
             const value = parseInt(document.getElementById('multiplierInput').value, 10);
             currentMultiplier = Math.max(1, value);
@@ -399,16 +506,249 @@
             multiplierModal.style.display = 'none';
         });
 
+        // --- CORE LOGIC: DATABASE AUTHENTICATION & LOADING ---
+        async function fetchFromDB(endpoint, options = {}) {
+            if (!dbConfig) {
+                console.error("Database is not configured.");
+                return null;
+            }
+            const url = new URL(dbConfig.url);
+            url.searchParams.append('token', dbConfig.token);
+            // In POST requests, the endpoint is in the body, for GET it's a param
+            if (options.method !== 'POST') {
+                url.searchParams.append('endpoint', endpoint);
+            }
+
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                dbStatus.textContent = `Error: ${error.message}.`;
+                return null;
+            }
+        }
+
+        async function loadDatabase() {
+            dbStatus.textContent = 'Loading products...';
+            const data = await fetchFromDB('getProducts');
+            
+            if (data && data.success && data.products) {
+                allProducts = data.products;
+                const categories = new Set(allProducts.map(p => p.Category).filter(Boolean));
+                allCategories = ['All', ...categories];
+                
+                renderProducts();
+                renderCategories();
+                
+                showView('catalog');
+                dbStatus.textContent = '';
+            } else {
+                dbStatus.textContent = `Failed to load products: ${data ? data.message : 'Network error'}`;
+                localStorage.removeItem('dbConfig');
+                dbConfig = null;
+                showView('login');
+            }
+        }
+
+        function onDbKeyScanSuccess(decodedText) {
+            try {
+                stopScanner(); // Stop the scanner used for the DB key
+                const url = new URL(decodedText);
+                const token = url.searchParams.get('token');
+                
+                if (!token) {
+                    dbStatus.textContent = 'Invalid Key: No token found.';
+                    return;
+                }
+
+                dbConfig = {
+                    url: `${url.protocol}//${url.host}${url.pathname}`,
+                    token: token
+                };
+                
+                localStorage.setItem('dbConfig', JSON.stringify(dbConfig));
+                loadDatabase();
+
+            } catch (error) {
+                dbStatus.textContent = 'Invalid QR Code Format. Must be a valid URL.';
+                console.error("DB Key Scan Error:", error);
+            }
+        }
+
+        document.getElementById('scanDbKeyButton').addEventListener('click', () => {
+            if (!html5QrCode) { alert("Scanner not initialized."); return; }
+            scanResult.textContent = "Scanning for Database Key...";
+            dbStatus.textContent = "Point camera at the Database QR Code...";
+            // We need a temporary reader element for this scan
+            const tempReader = document.createElement('div');
+            tempReader.style.display = 'none';
+            document.body.appendChild(tempReader);
+            const tempQrCode = new Html5Qrcode(tempReader.id);
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 5, qrbox: { width: 250, height: 250 } },
+                onDbKeyScanSuccess,
+                (error) => {}
+            ).catch(err => {
+                alert("Could not start camera for DB Key scan.");
+            });
+        });
+
+        // --- CORE LOGIC: RENDERING & UI ---
+        function renderProducts() {
+            productList.innerHTML = '';
+            const searchTerm = searchInput.value.toLowerCase();
+            
+            const filteredProducts = allProducts.filter(product => {
+                const inCategory = activeCategory === 'All' || product.Category === activeCategory;
+                const matchesSearch = product.ProductName.toLowerCase().includes(searchTerm) || 
+                                      (product.Barcode && product.Barcode.toLowerCase().includes(searchTerm));
+                return inCategory && matchesSearch;
+            });
+
+            if (filteredProducts.length === 0) {
+                productList.innerHTML = `<p class="text-gray-500 text-center">No products found.</p>`;
+            } else {
+                filteredProducts.forEach(product => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-3 rounded-lg shadow flex items-center gap-4 cursor-pointer hover:bg-gray-50';
+                    card.innerHTML = `
+                        <img src="${product.ImageBase64 || 'https://via.placeholder.com/80'}" class="w-20 h-20 object-cover rounded-md bg-gray-200">
+                        <div class="flex-grow">
+                            <h3 class="font-bold text-lg">${product.ProductName}</h3>
+                            <p class="text-sm text-gray-600">${product.Barcode || 'No Barcode'}</p>
+                            <p class="text-sm text-gray-500">Category: ${product.Category || 'None'}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xl font-bold">${product.StockCount}</p>
+                            <p class="text-xs text-gray-500">In Stock</p>
+                        </div>
+                    `;
+                    card.addEventListener('click', () => openProductModal(product));
+                    productList.appendChild(card);
+                });
+            }
+        }
+
+        function renderCategories() {
+            categoryFilters.innerHTML = '';
+            allCategories.forEach(category => {
+                const button = document.createElement('button');
+                button.textContent = category;
+                button.className = 'px-3 py-1 text-sm font-medium rounded-full';
+                button.className += (category === activeCategory) ? ' bg-blue-500 text-white' : ' bg-gray-200 text-gray-700';
+                button.addEventListener('click', () => {
+                    activeCategory = category;
+                    renderCategories();
+                    renderProducts();
+                });
+                categoryFilters.appendChild(button);
+            });
+        }
+
+        // --- PRODUCT MODAL & FORM LOGIC ---
+        function openProductModal(product = null) {
+            productForm.reset();
+            imagePreview.classList.add('hidden');
+            deleteProductButton.classList.add('hidden');
+            imageBase64Input.value = '';
+
+            if (product) {
+                document.getElementById('productModalTitle').textContent = 'Edit Product';
+                document.getElementById('productId').value = product.ProductID;
+                document.getElementById('productName').value = product.ProductName;
+                document.getElementById('productBarcode').value = product.Barcode;
+                document.getElementById('productStock').value = product.StockCount;
+                document.getElementById('productCategory').value = product.Category;
+                if (product.ImageBase64) {
+                    imagePreview.src = product.ImageBase64;
+                    imagePreview.classList.remove('hidden');
+                    imageBase64Input.value = product.ImageBase64;
+                }
+                deleteProductButton.classList.remove('hidden');
+            } else {
+                document.getElementById('productModalTitle').textContent = 'Add New Product';
+            }
+            productModal.style.display = 'flex';
+        }
+
+        function closeProductModal() {
+            productModal.style.display = 'none';
+        }
+
+        addProductButton.addEventListener('click', () => openProductModal());
+        cancelProductForm.addEventListener('click', closeProductModal);
+        showCatalogButton.addEventListener('click', () => {
+             if (dbConfig) {
+                sessionModal.style.display = 'none';
+                showView('catalog');
+             } else {
+                alert("Please scan the database key first.");
+                showView('login');
+             }
+        });
+
+        productImageInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    imagePreview.classList.remove('hidden');
+                    imageBase64Input.value = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        productForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const productData = {
+                ProductID: document.getElementById('productId').value,
+                ProductName: document.getElementById('productName').value,
+                Barcode: document.getElementById('productBarcode').value,
+                StockCount: document.getElementById('productStock').value,
+                Category: document.getElementById('productCategory').value,
+                ImageBase64: imageBase64Input.value,
+            };
+
+            const endpoint = productData.ProductID ? 'updateProduct' : 'addProduct';
+            const response = await fetchFromDB(null, { // endpoint is now in the body
+                method: 'POST',
+                // mode: 'no-cors', // Required for simple triggers in Apps Script
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Required for simple triggers
+                body: JSON.stringify({ endpoint: endpoint, data: productData })
+            });
+
+            if (response && response.success) {
+                closeProductModal();
+                await loadDatabase();
+            } else {
+                alert(`Error: ${response ? response.message : 'Could not save product.'}`);
+            }
+        });
+
         // --- INITIALIZATION ---
         window.addEventListener('DOMContentLoaded', () => {
-            sessionModal.style.display = 'flex';
             html5QrCode = new Html5Qrcode("reader");
 
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(() => console.log('Service Worker Registered'))
-                    .catch(error => console.error('Service Worker Registration Failed:', error));
+                navigator.serviceWorker.register('/service-worker.js').catch(err => console.error(err));
             }
+            
+            const savedDbConfig = localStorage.getItem('dbConfig');
+            if (savedDbConfig) {
+                dbConfig = JSON.parse(savedDbConfig);
+                sessionModal.style.display = 'flex'; // Show session select first
+                loadDatabase(); // Load in background
+            } else {
+                sessionModal.style.display = 'none';
+                showView('login');
+            }
+            searchInput.addEventListener('input', renderProducts);
         });
     </script>
 </body>
