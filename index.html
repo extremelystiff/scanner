@@ -219,319 +219,319 @@
         </div>
     </div>
 
+<script>
+    // --- GLOBAL STATE ---
+    let currentSession = null;
+    let currentMultiplier = 1;
+    let prizeScanner = null;
+    let dbScanner = null;
+    let isScannerRunning = false;
+    let commandCharacteristic = null;
+    let audioContext;
+    let isScanCooldown = false;
+    let dbConfig = null;
+    let allProducts = [];
+    let allCategories = [];
+    let activeCategory = 'All';
 
-    <script>
-        // --- GLOBAL STATE ---
-        let currentSession = null;
-        let currentMultiplier = 1;
-        let prizeScanner = null;
-        let dbScanner = null;
-        let isScannerRunning = false;
-        let commandCharacteristic = null;
-        let audioContext;
-        let isScanCooldown = false;
-        let dbConfig = null;
-        let allProducts = [];
-        let allCategories = [];
-        let activeCategory = 'All';
+    // --- CONSTANTS ---
+    const SERVICE_UUID = "0000180a-0000-1000-8000-00805f9b34fb";
+    const COMMAND_CHARACTERISTIC_UUID = "00002a57-0000-1000-8000-00805f9b34fb";
+    const STATUS_CHARACTERISTIC_UUID = "00002a58-0000-1000-8000-00805f9b34fb";
+    const MAX_IMAGE_DIMENSION = 800; // Max width/height for resized images
+    
+    // --- DOM REFERENCES ---
+    const scannerView = document.getElementById('scannerView');
+    const connectButton = document.getElementById('connectButton');
+    const bleStatus = document.getElementById('bleStatus');
+    const sessionModal = document.getElementById('sessionModal');
+    const multiplierModal = document.getElementById('multiplierModal');
+    const currentSessionName = document.getElementById('currentSessionName');
+    const scanResult = document.getElementById('scanResult');
+    const multiplierLabel = document.getElementById('multiplierLabel');
+    const scanButton = document.getElementById('scanButton');
+    const sessionIndicator = document.getElementById('sessionIndicator');
+    const databaseLoginView = document.getElementById('databaseLoginView');
+    const productCatalogView = document.getElementById('productCatalogView');
+    const dbStatus = document.getElementById('dbStatus');
+    const productList = document.getElementById('productList');
+    const categoryFilters = document.getElementById('categoryFilters');
+    const searchInput = document.getElementById('searchInput');
+    const showCatalogButton = document.getElementById('showCatalogButton');
+    const productModal = document.getElementById('productModal');
+    const productForm = document.getElementById('productForm');
+    const cancelProductForm = document.getElementById('cancelProductForm');
+    const addProductButton = document.getElementById('addProductButton');
+    const deleteProductButton = document.getElementById('deleteProductButton');
+    const imagePreview = document.getElementById('imagePreview');
+    const productImageInput = document.getElementById('productImage');
+    const imageBase64Input = document.getElementById('imageBase64');
+    const dbScannerModal = document.getElementById('dbScannerModal');
+    const cancelDbScanButton = document.getElementById('cancelDbScanButton');
+    const scanDbKeyButton = document.getElementById('scanDbKeyButton');
 
-        // --- CONSTANTS ---
-        const SERVICE_UUID = "0000180a-0000-1000-8000-00805f9b34fb";
-        const COMMAND_CHARACTERISTIC_UUID = "00002a57-0000-1000-8000-00805f9b34fb";
-        const STATUS_CHARACTERISTIC_UUID = "00002a58-0000-1000-8000-00805f9b34fb";
-        
-        // --- DOM REFERENCES ---
-        const scannerView = document.getElementById('scannerView');
-        const connectButton = document.getElementById('connectButton');
-        const bleStatus = document.getElementById('bleStatus');
-        const sessionModal = document.getElementById('sessionModal');
-        const multiplierModal = document.getElementById('multiplierModal');
-        const currentSessionName = document.getElementById('currentSessionName');
-        const scanResult = document.getElementById('scanResult');
-        const multiplierLabel = document.getElementById('multiplierLabel');
-        const scanButton = document.getElementById('scanButton');
-        const sessionIndicator = document.getElementById('sessionIndicator');
-        const databaseLoginView = document.getElementById('databaseLoginView');
-        const productCatalogView = document.getElementById('productCatalogView');
-        const dbStatus = document.getElementById('dbStatus');
-        const productList = document.getElementById('productList');
-        const categoryFilters = document.getElementById('categoryFilters');
-        const searchInput = document.getElementById('searchInput');
-        const showCatalogButton = document.getElementById('showCatalogButton');
-        const productModal = document.getElementById('productModal');
-        const productForm = document.getElementById('productForm');
-        const cancelProductForm = document.getElementById('cancelProductForm');
-        const addProductButton = document.getElementById('addProductButton');
-        const deleteProductButton = document.getElementById('deleteProductButton');
-        const imagePreview = document.getElementById('imagePreview');
-        const productImageInput = document.getElementById('productImage');
-        const imageBase64Input = document.getElementById('imageBase64');
-        const dbScannerModal = document.getElementById('dbScannerModal');
-        const cancelDbScanButton = document.getElementById('cancelDbScanButton');
-        const scanDbKeyButton = document.getElementById('scanDbKeyButton');
-
-
-        // --- FEEDBACK & UTILITY FUNCTIONS ---
-        function playBeep() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.2);
+    // --- FEEDBACK & UTILITY FUNCTIONS ---
+    function playBeep() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.2);
+    }
 
-        function vibrate() {
-            if ('vibrate' in navigator) {
-                navigator.vibrate(200);
-            }
+    function vibrate() {
+        if ('vibrate' in navigator) {
+            navigator.vibrate(200);
         }
-        
-        function showView(view) {
-            scannerView.style.display = 'none';
-            databaseLoginView.style.display = 'none';
-            productCatalogView.style.display = 'none';
-            sessionIndicator.style.display = 'none';
+    }
+    
+    function showView(view) {
+        scannerView.style.display = 'none';
+        databaseLoginView.style.display = 'none';
+        productCatalogView.style.display = 'none';
+        sessionIndicator.style.display = 'none';
 
-            if (view === 'scanner') {
-                scannerView.style.display = 'flex';
-                sessionIndicator.style.display = 'flex';
-            } else if (view === 'login') {
-                databaseLoginView.style.display = 'flex';
-            } else if (view === 'catalog') {
-                productCatalogView.style.display = 'flex';
-            }
+        if (view === 'scanner') {
+            scannerView.style.display = 'flex';
+            sessionIndicator.style.display = 'flex';
+        } else if (view === 'login') {
+            databaseLoginView.style.display = 'flex';
+        } else if (view === 'catalog') {
+            productCatalogView.style.display = 'flex';
         }
+    }
 
-        // --- BLE LOGIC ---
-        async function sendBleCommand(command) {
-            if (!commandCharacteristic) {
-                bleStatus.textContent = 'Scanner is disconnected.';
-                return false;
-            }
-            try {
-                const encoder = new TextEncoder();
-                await commandCharacteristic.writeValue(encoder.encode(command));
-                console.log(`Sent: ${command}`);
-                return true;
-            } catch (error) {
-                console.error(`Send Error for command "${command}":`, error);
-                bleStatus.textContent = `Send Error: ${error.message}`;
-                return false;
-            }
+    // --- BLE LOGIC ---
+    async function sendBleCommand(command) {
+        if (!commandCharacteristic) {
+            bleStatus.textContent = 'Scanner is disconnected.';
+            return false;
         }
-
-        async function sendSequence(commands) {
-            bleStatus.textContent = `Processing ${commands.length} commands...`;
-            for (const command of commands) {
-                const success = await sendBleCommand(command);
-                if (!success) {
-                    bleStatus.textContent = `Failed on command: ${command}`;
-                    return;
-                }
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            bleStatus.textContent = 'Sequence sent successfully!';
+        try {
+            const encoder = new TextEncoder();
+            await commandCharacteristic.writeValue(encoder.encode(command));
+            console.log(`Sent: ${command}`);
+            return true;
+        } catch (error) {
+            console.error(`Send Error for command "${command}":`, error);
+            bleStatus.textContent = `Send Error: ${error.message}`;
+            return false;
         }
+    }
 
-        connectButton.addEventListener('click', async () => {
-            if (!navigator.bluetooth) {
-                alert('Web Bluetooth API is not available.');
+    async function sendSequence(commands) {
+        bleStatus.textContent = `Processing ${commands.length} commands...`;
+        for (const command of commands) {
+            const success = await sendBleCommand(command);
+            if (!success) {
+                bleStatus.textContent = `Failed on command: ${command}`;
                 return;
             }
-            try {
-                bleStatus.textContent = "Requesting device...";
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }],
-                    optionalServices: [SERVICE_UUID]
-                });
-                device.addEventListener('gattserverdisconnected', onDisconnected);
-                bleStatus.textContent = "Connecting...";
-                const server = await device.gatt.connect();
-                bleStatus.textContent = "Getting Service...";
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                bleStatus.textContent = "Getting Characteristics...";
-                commandCharacteristic = await service.getCharacteristic(COMMAND_CHARACTERISTIC_UUID);
-                const statusCharacteristic = await service.getCharacteristic(STATUS_CHARACTERISTIC_UUID);
-                await statusCharacteristic.startNotifications();
-                statusCharacteristic.addEventListener('characteristicvaluechanged', handleStatusUpdate);
-                connectButton.disabled = true;
-                connectButton.textContent = 'Connected';
-                bleStatus.textContent = '✅ Ready to Scan';
-            } catch (error) {
-                bleStatus.textContent = `Connection Failed: ${error.message}`;
-                console.error(error);
-            }
-        });
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        bleStatus.textContent = 'Sequence sent successfully!';
+    }
 
-        function onDisconnected() {
-            bleStatus.textContent = 'Disconnected. Please reconnect.';
-            connectButton.disabled = false;
-            connectButton.textContent = 'Connect to Scanner';
-            commandCharacteristic = null;
+    connectButton.addEventListener('click', async () => {
+        if (!navigator.bluetooth) {
+            alert('Web Bluetooth API is not available.');
+            return;
+        }
+        try {
+            bleStatus.textContent = "Requesting device...";
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ services: [SERVICE_UUID] }],
+                optionalServices: [SERVICE_UUID]
+            });
+            device.addEventListener('gattserverdisconnected', onDisconnected);
+            bleStatus.textContent = "Connecting...";
+            const server = await device.gatt.connect();
+            bleStatus.textContent = "Getting Service...";
+            const service = await server.getPrimaryService(SERVICE_UUID);
+            bleStatus.textContent = "Getting Characteristics...";
+            commandCharacteristic = await service.getCharacteristic(COMMAND_CHARACTERISTIC_UUID);
+            const statusCharacteristic = await service.getCharacteristic(STATUS_CHARACTERISTIC_UUID);
+            await statusCharacteristic.startNotifications();
+            statusCharacteristic.addEventListener('characteristicvaluechanged', handleStatusUpdate);
+            connectButton.disabled = true;
+            connectButton.textContent = 'Connected';
+            bleStatus.textContent = '✅ Ready to Scan';
+        } catch (error) {
+            bleStatus.textContent = `Connection Failed: ${error.message}`;
+            console.error(error);
+        }
+    });
+
+    function onDisconnected() {
+        bleStatus.textContent = 'Disconnected. Please reconnect.';
+        connectButton.disabled = false;
+        connectButton.textContent = 'Connect to Scanner';
+        commandCharacteristic = null;
+        if (isScannerRunning) {
+            stopPrizeScanner();
+        }
+    }
+
+    function handleStatusUpdate(event) {
+        const statusMessage = new TextDecoder().decode(event.target.value);
+        bleStatus.textContent = `ESP32: ${statusMessage}`;
+    }
+
+    // --- SESSION MANAGEMENT ---
+    function setSession(sessionCommand) {
+        currentSession = sessionCommand;
+        const sessionNumber = sessionCommand.slice(-2);
+        currentSessionName.textContent = `S${sessionNumber}`;
+        sessionModal.style.display = 'none';
+        sendSequence([currentSession]);
+        showView('scanner');
+    }
+    document.querySelectorAll('.session-btn').forEach(button => button.addEventListener('click', () => setSession(button.dataset.session)));
+    document.getElementById('changeSessionButton').addEventListener('click', () => sessionModal.style.display = 'flex');
+    
+    document.getElementById('closeSessionButton').addEventListener('click', () => {
+        if (!currentSession) {
+            alert('No session is active.');
+            return;
+        }
+        sendSequence(['CLOSE SESSION']);
+    });
+
+    // --- PRIZE SCANNER LOGIC ---
+    const onPrizeScanSuccess = (decodedText) => {
+        if (isScanCooldown) return;
+        isScanCooldown = true;
+        
+        playBeep();
+        vibrate();
+
+        scanResult.textContent = `Scanned: ${decodedText}`;
+        
+        let commands = [currentSession]; 
+        if (currentMultiplier > 1) {
+            commands.push(currentMultiplier.toString());
+        }
+        commands.push(decodedText);
+        
+        sendSequence(commands);
+        
+        currentMultiplier = 1;
+        multiplierLabel.textContent = "Qty: 1";
+
+        setTimeout(() => {
+            isScanCooldown = false;
             if (isScannerRunning) {
-                stopPrizeScanner();
+                scanResult.textContent = "Scanning...";
             }
+        }, 2000);
+    };
+    
+    function startPrizeScanner() {
+        if (isScannerRunning || !prizeScanner) return;
+        if (!currentSession) {
+            alert("Please select a session first.");
+            sessionModal.style.display = 'flex';
+            return;
         }
-
-        function handleStatusUpdate(event) {
-            const statusMessage = new TextDecoder().decode(event.target.value);
-            bleStatus.textContent = `ESP32: ${statusMessage}`;
-        }
-
-        // --- SESSION MANAGEMENT ---
-        function setSession(sessionCommand) {
-            currentSession = sessionCommand;
-            const sessionNumber = sessionCommand.slice(-2);
-            currentSessionName.textContent = `S${sessionNumber}`;
-            sessionModal.style.display = 'none';
-            sendSequence([currentSession]);
-            showView('scanner');
-        }
-        document.querySelectorAll('.session-btn').forEach(button => button.addEventListener('click', () => setSession(button.dataset.session)));
-        document.getElementById('changeSessionButton').addEventListener('click', () => sessionModal.style.display = 'flex');
-        
-        document.getElementById('closeSessionButton').addEventListener('click', () => {
-            if (!currentSession) {
-                alert('No session is active.');
-                return;
-            }
-            sendSequence(['CLOSE SESSION']);
+        isScannerRunning = true;
+        scanButton.classList.add('text-green-400');
+        scanResult.textContent = "Scanning...";
+        prizeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onPrizeScanSuccess, (e) => {})
+        .catch(err => {
+            isScannerRunning = false;
+            scanButton.classList.remove('text-green-400');
+            scanResult.textContent = "Error starting camera.";
         });
-
-        // --- PRIZE SCANNER LOGIC ---
-        const onPrizeScanSuccess = (decodedText) => {
-            if (isScanCooldown) return;
-            isScanCooldown = true;
-            
-            playBeep();
-            vibrate();
-
-            scanResult.textContent = `Scanned: ${decodedText}`;
-            
-            let commands = [currentSession]; 
-            if (currentMultiplier > 1) {
-                commands.push(currentMultiplier.toString());
-            }
-            commands.push(decodedText);
-            
-            sendSequence(commands);
-            
-            currentMultiplier = 1;
-            multiplierLabel.textContent = "Qty: 1";
-
-            setTimeout(() => {
-                isScanCooldown = false;
-                if (isScannerRunning) {
-                    scanResult.textContent = "Scanning...";
-                }
-            }, 2000);
-        };
-        
-        function startPrizeScanner() {
-            if (isScannerRunning || !prizeScanner) return;
-            if (!currentSession) {
-                alert("Please select a session first.");
-                sessionModal.style.display = 'flex';
-                return;
-            }
-            isScannerRunning = true;
-            scanButton.classList.add('text-green-400');
-            scanResult.textContent = "Scanning...";
-            prizeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onPrizeScanSuccess, (e) => {})
-            .catch(err => {
-                isScannerRunning = false;
-                scanButton.classList.remove('text-green-400');
-                scanResult.textContent = "Error starting camera.";
-            });
-        }
-        
-        function stopPrizeScanner() {
-            if (!isScannerRunning || !prizeScanner || prizeScanner.getState() !== 2) return;
-            prizeScanner.stop().finally(() => {
-                isScannerRunning = false;
-                scanButton.classList.remove('text-green-400');
-                scanResult.textContent = "Hold Scan Button to Scan";
-            });
-        }
-        
-        scanButton.addEventListener('mousedown', startPrizeScanner);
-        scanButton.addEventListener('mouseup', stopPrizeScanner);
-        scanButton.addEventListener('mouseleave', stopPrizeScanner);
-        scanButton.addEventListener('touchstart', (e) => { e.preventDefault(); startPrizeScanner(); });
-        scanButton.addEventListener('touchend', stopPrizeScanner);
-
-        // --- OTHER UI ACTIONS (Prize Scanner) ---
-        document.getElementById('redeemButton').addEventListener('click', () => {
-             if (!currentSession) {
-                alert('Please select a session before redeeming.');
-                return;
-            }
-            sendSequence([currentSession, 'REDEMPTION']);
+    }
+    
+    function stopPrizeScanner() {
+        if (!isScannerRunning || !prizeScanner || prizeScanner.getState() !== 2) return;
+        prizeScanner.stop().finally(() => {
+            isScannerRunning = false;
+            scanButton.classList.remove('text-green-400');
+            scanResult.textContent = "Hold Scan Button to Scan";
         });
+    }
+    
+    scanButton.addEventListener('mousedown', startPrizeScanner);
+    scanButton.addEventListener('mouseup', stopPrizeScanner);
+    scanButton.addEventListener('mouseleave', stopPrizeScanner);
+    scanButton.addEventListener('touchstart', (e) => { e.preventDefault(); startPrizeScanner(); });
+    scanButton.addEventListener('touchend', stopPrizeScanner);
 
-        document.getElementById('multiplierButton').addEventListener('click', () => multiplierModal.style.display = 'flex');
-        document.getElementById('cancelMultiplier').addEventListener('click', () => multiplierModal.style.display = 'none');
-        document.getElementById('confirmMultiplier').addEventListener('click', () => {
-            const value = parseInt(document.getElementById('multiplierInput').value, 10);
-            currentMultiplier = Math.max(1, value);
-            multiplierLabel.textContent = `Qty: ${currentMultiplier}`;
-            multiplierModal.style.display = 'none';
-        });
+    // --- OTHER UI ACTIONS (Prize Scanner) ---
+    document.getElementById('redeemButton').addEventListener('click', () => {
+         if (!currentSession) {
+            alert('Please select a session before redeeming.');
+            return;
+        }
+        sendSequence([currentSession, 'REDEMPTION']);
+    });
 
-        // --- DATABASE AUTH & LOADING LOGIC ---
-        async function fetchFromDB(endpoint, options = {}) {
-            if (!dbConfig) {
-                console.error("Database is not configured.");
-                return null;
-            }
-            const url = new URL(dbConfig.url);
-            url.searchParams.append('token', dbConfig.token);
-            if (options.method !== 'POST') {
-                url.searchParams.append('endpoint', endpoint);
-            }
+    document.getElementById('multiplierButton').addEventListener('click', () => multiplierModal.style.display = 'flex');
+    document.getElementById('cancelMultiplier').addEventListener('click', () => multiplierModal.style.display = 'none');
+    document.getElementById('confirmMultiplier').addEventListener('click', () => {
+        const value = parseInt(document.getElementById('multiplierInput').value, 10);
+        currentMultiplier = Math.max(1, value);
+        multiplierLabel.textContent = `Qty: ${currentMultiplier}`;
+        multiplierModal.style.display = 'none';
+    });
 
-            try {
-                const response = await fetch(url, options);
-                if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
-                return await response.json();
-            } catch (error) {
-                console.error('Fetch error:', error);
-                dbStatus.textContent = `Error: ${error.message}.`;
-                return null;
-            }
+    // --- DATABASE AUTH & LOADING LOGIC ---
+    async function fetchFromDB(endpoint, options = {}) {
+        if (!dbConfig) {
+            console.error("Database is not configured.");
+            return null;
+        }
+        const url = new URL(dbConfig.url);
+        url.searchParams.append('token', dbConfig.token);
+        if (options.method !== 'POST') {
+            url.searchParams.append('endpoint', endpoint);
         }
 
-        async function loadDatabase() {
-            dbStatus.textContent = 'Loading products...';
-            const data = await fetchFromDB('getProducts');
-            
-            if (data && data.success && data.products) {
-                allProducts = data.products;
-                const categories = new Set(allProducts.map(p => p.Category).filter(Boolean));
-                allCategories = ['All', ...categories];
-                
-                renderProducts();
-                renderCategories();
-                
-                sessionModal.style.display = 'flex'; // Show action choice
-                dbStatus.textContent = '';
-            } else {
-                dbStatus.textContent = `Failed to load products: ${data ? data.message : 'Network error'}`;
-                localStorage.removeItem('dbConfig');
-                dbConfig = null;
-                showView('login');
-            }
+        try {
+            const response = await fetch(url, options);
+            if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
+            return await response.json();
+        } catch (error) {
+            console.error('Fetch error:', error);
+            dbStatus.textContent = `Error: ${error.message}.`;
+            return null;
         }
+    }
+
+    async function loadDatabase() {
+        dbStatus.textContent = 'Loading products...';
+        const data = await fetchFromDB('getProducts');
         
-        function onDbKeyScanSuccess(decodedText) {
+        if (data && data.success && data.products) {
+            allProducts = data.products;
+            const categories = new Set(allProducts.map(p => p.Category).filter(Boolean));
+            allCategories = ['All', ...categories];
+            
+            renderProducts();
+            renderCategories();
+            
+            sessionModal.style.display = 'flex';
+            dbStatus.textContent = '';
+        } else {
+            dbStatus.textContent = `Failed to load products: ${data ? data.message : 'Network error'}`;
+            localStorage.removeItem('dbConfig');
+            dbConfig = null;
+            showView('login');
+        }
+    }
+    
+    function onDbKeyScanSuccess(decodedText) {
+        if(dbScanner && dbScanner.getState() === 2) {
             dbScanner.stop().then(() => {
                 dbScannerModal.style.display = 'none';
                 try {
@@ -549,213 +549,211 @@
                 }
             });
         }
-
-        scanDbKeyButton.addEventListener('click', () => {
-            dbScannerModal.style.display = 'flex';
-            dbScanner.start({ facingMode: "environment" }, { fps: 5, qrbox: { width: 250, height: 250 } }, onDbKeyScanSuccess, (e) => {})
-            .catch(err => {
-                alert("Could not start camera. Please grant permission.");
-                dbScannerModal.style.display = 'none';
-            });
-        });
-
-        cancelDbScanButton.addEventListener('click', () => {
-            if (dbScanner && dbScanner.getState() === 2) {
-                dbScanner.stop();
-            }
+    }
+    
+    scanDbKeyButton.addEventListener('click', () => {
+        dbScannerModal.style.display = 'flex';
+        dbScanner.start({ facingMode: "environment" }, { fps: 5, qrbox: { width: 250, height: 250 } }, onDbKeyScanSuccess, (e) => {})
+        .catch(err => {
+            alert("Could not start camera. Please grant permission.");
             dbScannerModal.style.display = 'none';
         });
+    });
 
-        // --- CATALOG RENDERING & UI ---
-        function renderProducts() {
-            productList.innerHTML = '';
-            const searchTerm = searchInput.value.toLowerCase();
-            
-            const filteredProducts = allProducts.filter(product => {
-                const inCategory = activeCategory === 'All' || product.Category === activeCategory;
-                const matchesSearch = product.ProductName.toLowerCase().includes(searchTerm) || 
-                                      (product.Barcode && product.Barcode.toLowerCase().includes(searchTerm));
-                return inCategory && matchesSearch;
-            });
-
-            if (filteredProducts.length === 0) {
-                productList.innerHTML = `<p class="text-gray-500 text-center">No products found.</p>`;
-            } else {
-                filteredProducts.forEach(product => {
-                    const card = document.createElement('div');
-                    card.className = 'bg-white p-3 rounded-lg shadow flex items-center gap-4 cursor-pointer hover:bg-gray-50';
-                    card.innerHTML = `
-                        <img src="${product.ImageBase64 || 'https://via.placeholder.com/80'}" class="w-20 h-20 object-cover rounded-md bg-gray-200">
-                        <div class="flex-grow">
-                            <h3 class="font-bold text-lg">${product.ProductName}</h3>
-                            <p class="text-sm text-gray-600">${product.Barcode || 'No Barcode'}</p>
-                            <p class="text-sm text-gray-500">Category: ${product.Category || 'None'}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-xl font-bold">${product.StockCount}</p>
-                            <p class="text-xs text-gray-500">In Stock</p>
-                        </div>
-                    `;
-                    card.addEventListener('click', () => openProductModal(product));
-                    productList.appendChild(card);
-                });
-            }
+    cancelDbScanButton.addEventListener('click', () => {
+        if (dbScanner && dbScanner.getState() === 2) {
+            dbScanner.stop();
         }
+        dbScannerModal.style.display = 'none';
+    });
 
-        function renderCategories() {
-            categoryFilters.innerHTML = '';
-            allCategories.forEach(category => {
-                const button = document.createElement('button');
-                button.textContent = category;
-                button.className = 'px-3 py-1 text-sm font-medium rounded-full';
-                button.className += (category === activeCategory) ? ' bg-blue-500 text-white' : ' bg-gray-200 text-gray-700';
-                button.addEventListener('click', () => {
-                    activeCategory = category;
-                    renderCategories();
-                    renderProducts();
-                });
-                categoryFilters.appendChild(button);
-            });
-        }
-
-        // --- PRODUCT MODAL & FORM LOGIC ---
-        function openProductModal(product = null) {
-            productForm.reset();
-            imagePreview.classList.add('hidden');
-            deleteProductButton.classList.add('hidden');
-            imageBase64Input.value = '';
-
-            if (product) {
-                document.getElementById('productModalTitle').textContent = 'Edit Product';
-                document.getElementById('productId').value = product.ProductID;
-                document.getElementById('productName').value = product.ProductName;
-                document.getElementById('productBarcode').value = product.Barcode;
-                document.getElementById('productStock').value = product.StockCount;
-                document.getElementById('productCategory').value = product.Category;
-                if (product.ImageBase64) {
-                    imagePreview.src = product.ImageBase64;
-                    imagePreview.classList.remove('hidden');
-                    imageBase64Input.value = product.ImageBase64;
-                }
-                deleteProductButton.classList.remove('hidden');
-            } else {
-                document.getElementById('productModalTitle').textContent = 'Add New Product';
-            }
-            productModal.style.display = 'flex';
-        }
-
-        function closeProductModal() {
-            productModal.style.display = 'none';
-        }
-
-        addProductButton.addEventListener('click', () => openProductModal());
-        cancelProductForm.addEventListener('click', closeProductModal);
+    // --- CATALOG RENDERING & UI ---
+    function renderProducts() {
+        productList.innerHTML = '';
+        const searchTerm = searchInput.value.toLowerCase();
         
-        showCatalogButton.addEventListener('click', () => {
-             if (dbConfig) {
-                sessionModal.style.display = 'none';
-                showView('catalog');
-             } else {
-                alert("Database not loaded. Please scan the database key from the login screen.");
-                sessionModal.style.display = 'none';
-                showView('login');
-             }
+        const filteredProducts = allProducts.filter(product => {
+            const inCategory = activeCategory === 'All' || product.Category === activeCategory;
+            const matchesSearch = product.ProductName.toLowerCase().includes(searchTerm) || 
+                                  (product.Barcode && product.Barcode.toLowerCase().includes(searchTerm));
+            return inCategory && matchesSearch;
         });
 
-        // ===================================================================
-        // ============= NEW, REVISED IMAGE HANDLING FUNCTION ================
-        // ===================================================================
-        productImageInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) {
-                return;
-            }
-
-            const reader = new FileReader();
-            
-            reader.onload = (e) => {
-                const image = new Image();
-                image.src = e.target.result;
-
-                image.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let { width, height } = image;
-
-                    // Calculate the new dimensions
-                    if (width > height) {
-                        if (width > MAX_IMAGE_DIMENSION) {
-                            height *= MAX_IMAGE_DIMENSION / width;
-                            width = MAX_IMAGE_DIMENSION;
-                        }
-                    } else {
-                        if (height > MAX_IMAGE_DIMENSION) {
-                            width *= MAX_IMAGE_DIMENSION / height;
-                            height = MAX_IMAGE_DIMENSION;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(image, 0, 0, width, height);
-                    
-                    // Get the resized image as a JPEG Base64 string (more compact than PNG)
-                    const resizedBase64 = canvas.toDataURL('image/jpeg', 0.8); // 0.8 is the quality level
-
-                    // Update the form
-                    imagePreview.src = resizedBase64;
-                    imagePreview.classList.remove('hidden');
-                    imageBase64Input.value = resizedBase64;
-                };
-            };
-
-            reader.readAsDataURL(file);
-        });
-
-        productForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const productData = {
-                ProductID: document.getElementById('productId').value,
-                ProductName: document.getElementById('productName').value,
-                Barcode: document.getElementById('productBarcode').value,
-                StockCount: document.getElementById('productStock').value,
-                Category: document.getElementById('productCategory').value,
-                ImageBase64: imageBase64Input.value,
-            };
-
-            const endpoint = productData.ProductID ? 'updateProduct' : 'addProduct';
-            const response = await fetchFromDB(null, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ endpoint: endpoint, data: productData })
+        if (filteredProducts.length === 0) {
+            productList.innerHTML = `<p class="text-gray-500 text-center">No products found.</p>`;
+        } else {
+            filteredProducts.forEach(product => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-3 rounded-lg shadow flex items-center gap-4 cursor-pointer hover:bg-gray-50';
+                card.innerHTML = `
+                    <img src="${product.ImageBase64 || 'https://via.placeholder.com/80'}" class="w-20 h-20 object-cover rounded-md bg-gray-200">
+                    <div class="flex-grow">
+                        <h3 class="font-bold text-lg">${product.ProductName}</h3>
+                        <p class="text-sm text-gray-600">${product.Barcode || 'No Barcode'}</p>
+                        <p class="text-sm text-gray-500">Category: ${product.Category || 'None'}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xl font-bold">${product.StockCount}</p>
+                        <p class="text-xs text-gray-500">In Stock</p>
+                    </div>
+                `;
+                card.addEventListener('click', () => openProductModal(product));
+                productList.appendChild(card);
             });
+        }
+    }
 
-            if (response && response.success) {
-                closeProductModal();
-                await loadDatabase();
-            } else {
-                alert(`Error: ${response ? response.message : 'Could not save product.'}`);
+    function renderCategories() {
+        categoryFilters.innerHTML = '';
+        allCategories.forEach(category => {
+            const button = document.createElement('button');
+            button.textContent = category;
+            button.className = `px-3 py-1 text-sm font-medium rounded-full ${(category === activeCategory) ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`;
+            button.addEventListener('click', () => {
+                activeCategory = category;
+                renderCategories();
+                renderProducts();
+            });
+            categoryFilters.appendChild(button);
+        });
+    }
+
+    // --- PRODUCT MODAL & FORM LOGIC ---
+    function openProductModal(product = null) {
+        productForm.reset();
+        imagePreview.classList.add('hidden');
+        deleteProductButton.classList.add('hidden');
+        imageBase64Input.value = '';
+
+        if (product) {
+            document.getElementById('productModalTitle').textContent = 'Edit Product';
+            document.getElementById('productId').value = product.ProductID;
+            document.getElementById('productName').value = product.ProductName;
+            document.getElementById('productBarcode').value = product.Barcode;
+            document.getElementById('productStock').value = product.StockCount;
+            document.getElementById('productCategory').value = product.Category;
+            if (product.ImageBase64) {
+                imagePreview.src = product.ImageBase64;
+                imagePreview.classList.remove('hidden');
+                imageBase64Input.value = product.ImageBase64;
             }
+            deleteProductButton.classList.remove('hidden');
+        } else {
+            document.getElementById('productModalTitle').textContent = 'Add New Product';
+        }
+        productModal.style.display = 'flex';
+    }
+    
+    function closeProductModal() {
+        productModal.style.display = 'none';
+    }
+    
+    addProductButton.addEventListener('click', () => openProductModal());
+    cancelProductForm.addEventListener('click', closeProductModal);
+    
+    showCatalogButton.addEventListener('click', () => {
+         if (dbConfig) {
+            sessionModal.style.display = 'none';
+            showView('catalog');
+         } else {
+            alert("Database not loaded. Please scan the database key from the login screen.");
+            sessionModal.style.display = 'none';
+            showView('login');
+         }
+    });
+
+    productImageInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) {
+            return;
+        }
+
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+            const image = new Image();
+            image.src = e.target.result;
+
+            image.onload = () => {
+                const canvas = document.createElement('canvas');
+                let { width, height } = image;
+
+                if (width > height) {
+                    if (width > MAX_IMAGE_DIMENSION) {
+                        height *= MAX_IMAGE_DIMENSION / width;
+                        width = MAX_IMAGE_DIMENSION;
+                    }
+                } else {
+                    if (height > MAX_IMAGE_DIMENSION) {
+                        width *= MAX_IMAGE_DIMENSION / height;
+                        height = MAX_IMAGE_DIMENSION;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(image, 0, 0, width, height);
+                
+                const resizedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+                imagePreview.src = resizedBase64;
+                imagePreview.classList.remove('hidden');
+                imageBase64Input.value = resizedBase64;
+            };
+        };
+        reader.readAsDataURL(file);
+    });
+    
+    productForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const productData = {
+            ProductID: document.getElementById('productId').value,
+            ProductName: document.getElementById('productName').value,
+            Barcode: document.getElementById('productBarcode').value,
+            StockCount: document.getElementById('productStock').value,
+            Category: document.getElementById('productCategory').value,
+            ImageBase64: imageBase64Input.value,
+        };
+
+        const endpoint = productData.ProductID ? 'updateProduct' : 'addProduct';
+        const response = await fetchFromDB(null, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ endpoint: endpoint, data: productData })
         });
 
-        // --- INITIALIZATION ---
-        window.addEventListener('DOMContentLoaded', () => {
-            prizeScanner = new Html5Qrcode("reader");
-            dbScanner = new Html5Qrcode("db-reader");
-
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/service-worker.js').catch(err => console.error(err));
-            }
-            
+        if (response && response.success) {
+            closeProductModal();
             const savedDbConfig = localStorage.getItem('dbConfig');
-            if (savedDbConfig) {
+            if(savedDbConfig) {
                 dbConfig = JSON.parse(savedDbConfig);
-                loadDatabase();
-            } else {
-                showView('login');
+                await loadDatabase(); // Re-fetch all data to show changes
+                showView('catalog'); // Ensure catalog is visible after the modal closes
             }
-            searchInput.addEventListener('input', renderProducts);
-        });
-    </script>
+        } else {
+            alert(`Error: ${response ? response.message : 'Could not save product.'}`);
+        }
+    });
+
+    // --- INITIALIZATION ---
+    window.addEventListener('DOMContentLoaded', () => {
+        prizeScanner = new Html5Qrcode("reader");
+        dbScanner = new Html5Qrcode("db-reader");
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js').catch(err => console.error(err));
+        }
+        
+        const savedDbConfig = localStorage.getItem('dbConfig');
+        if (savedDbConfig) {
+            dbConfig = JSON.parse(savedDbConfig);
+            loadDatabase();
+        } else {
+            showView('login');
+        }
+        searchInput.addEventListener('input', renderProducts);
+    });
+</script>
 </body>
 </html>
