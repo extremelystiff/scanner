@@ -648,7 +648,7 @@
     }
 
     // --- PRODUCT MODAL & FORM LOGIC ---
-    function openProductModal(product = null) {
+function openProductModal(product = null) {
         productForm.reset();
         imagePreview.classList.add('hidden');
         deleteProductButton.classList.add('hidden');
@@ -670,6 +670,7 @@
             deleteProductButton.classList.remove('hidden');
         } else {
             document.getElementById('productModalTitle').textContent = 'Add New Product';
+            document.getElementById('productId').value = ''; // <-- ADD THIS LINE
             document.getElementById('productRowNumber').value = ''; // Clear for new products
         }
         productModal.style.display = 'flex';
