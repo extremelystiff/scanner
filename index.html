@@ -662,17 +662,54 @@
              }
         });
 
+        // ===================================================================
+        // ============= NEW, REVISED IMAGE HANDLING FUNCTION ================
+        // ===================================================================
         productImageInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    imagePreview.src = e.target.result;
-                    imagePreview.classList.remove('hidden');
-                    imageBase64Input.value = e.target.result;
-                };
-                reader.readAsDataURL(file);
+            if (!file) {
+                return;
             }
+
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                const image = new Image();
+                image.src = e.target.result;
+
+                image.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let { width, height } = image;
+
+                    // Calculate the new dimensions
+                    if (width > height) {
+                        if (width > MAX_IMAGE_DIMENSION) {
+                            height *= MAX_IMAGE_DIMENSION / width;
+                            width = MAX_IMAGE_DIMENSION;
+                        }
+                    } else {
+                        if (height > MAX_IMAGE_DIMENSION) {
+                            width *= MAX_IMAGE_DIMENSION / height;
+                            height = MAX_IMAGE_DIMENSION;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(image, 0, 0, width, height);
+                    
+                    // Get the resized image as a JPEG Base64 string (more compact than PNG)
+                    const resizedBase64 = canvas.toDataURL('image/jpeg', 0.8); // 0.8 is the quality level
+
+                    // Update the form
+                    imagePreview.src = resizedBase64;
+                    imagePreview.classList.remove('hidden');
+                    imageBase64Input.value = resizedBase64;
+                };
+            };
+
+            reader.readAsDataURL(file);
         });
 
         productForm.addEventListener('submit', async (event) => {
