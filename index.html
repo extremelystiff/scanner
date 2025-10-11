@@ -188,6 +188,7 @@
             <h2 id="productModalTitle" class="text-2xl font-bold mb-4">Add New Product</h2>
             <form id="productForm">
                 <input type="hidden" id="productId">
+                <input type="hidden" id="productRowNumber">
                 <div class="mb-4">
                     <label for="productName" class="block text-sm font-medium text-gray-700">Product Name</label>
                     <input type="text" id="productName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" required>
@@ -218,7 +219,6 @@
             </form>
         </div>
     </div>
-
 <script>
     // --- GLOBAL STATE ---
     let currentSession = null;
@@ -238,7 +238,7 @@
     const SERVICE_UUID = "0000180a-0000-1000-8000-00805f9b34fb";
     const COMMAND_CHARACTERISTIC_UUID = "00002a57-0000-1000-8000-00805f9b34fb";
     const STATUS_CHARACTERISTIC_UUID = "00002a58-0000-1000-8000-00805f9b34fb";
-    const MAX_IMAGE_DIMENSION = 800; // Max width/height for resized images
+    const MAX_IMAGE_DIMENSION = 800;
     
     // --- DOM REFERENCES ---
     const scannerView = document.getElementById('scannerView');
@@ -409,23 +409,17 @@
     const onPrizeScanSuccess = (decodedText) => {
         if (isScanCooldown) return;
         isScanCooldown = true;
-        
         playBeep();
         vibrate();
-
         scanResult.textContent = `Scanned: ${decodedText}`;
-        
         let commands = [currentSession]; 
         if (currentMultiplier > 1) {
             commands.push(currentMultiplier.toString());
         }
         commands.push(decodedText);
-        
         sendSequence(commands);
-        
         currentMultiplier = 1;
         multiplierLabel.textContent = "Qty: 1";
-
         setTimeout(() => {
             isScanCooldown = false;
             if (isScannerRunning) {
@@ -511,15 +505,12 @@
     async function loadDatabase() {
         dbStatus.textContent = 'Loading products...';
         const data = await fetchFromDB('getProducts');
-        
         if (data && data.success && data.products) {
             allProducts = data.products;
             const categories = new Set(allProducts.map(p => p.Category).filter(Boolean));
             allCategories = ['All', ...categories];
-            
             renderProducts();
             renderCategories();
-            
             sessionModal.style.display = 'flex';
             dbStatus.textContent = '';
         } else {
@@ -571,7 +562,6 @@
     function renderProducts() {
         productList.innerHTML = '';
         const searchTerm = searchInput.value.toLowerCase();
-        
         const filteredProducts = allProducts.filter(product => {
             const inCategory = activeCategory === 'All' || product.Category === activeCategory;
             const matchesSearch = product.ProductName.toLowerCase().includes(searchTerm) || 
@@ -628,6 +618,7 @@
         if (product) {
             document.getElementById('productModalTitle').textContent = 'Edit Product';
             document.getElementById('productId').value = product.ProductID;
+            document.getElementById('productRowNumber').value = product.rowNumber; // <-- Important for efficient update
             document.getElementById('productName').value = product.ProductName;
             document.getElementById('productBarcode').value = product.Barcode;
             document.getElementById('productStock').value = product.StockCount;
@@ -640,6 +631,7 @@
             deleteProductButton.classList.remove('hidden');
         } else {
             document.getElementById('productModalTitle').textContent = 'Add New Product';
+            document.getElementById('productRowNumber').value = ''; // Clear for new products
         }
         productModal.style.display = 'flex';
     }
@@ -664,20 +656,14 @@
 
     productImageInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
-        if (!file) {
-            return;
-        }
-
+        if (!file) { return; }
         const reader = new FileReader();
-        
         reader.onload = (e) => {
             const image = new Image();
             image.src = e.target.result;
-
             image.onload = () => {
                 const canvas = document.createElement('canvas');
                 let { width, height } = image;
-
                 if (width > height) {
                     if (width > MAX_IMAGE_DIMENSION) {
                         height *= MAX_IMAGE_DIMENSION / width;
@@ -689,14 +675,11 @@
                         height = MAX_IMAGE_DIMENSION;
                     }
                 }
-
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(image, 0, 0, width, height);
-                
                 const resizedBase64 = canvas.toDataURL('image/jpeg', 0.8);
-
                 imagePreview.src = resizedBase64;
                 imagePreview.classList.remove('hidden');
                 imageBase64Input.value = resizedBase64;
@@ -714,6 +697,7 @@
             StockCount: document.getElementById('productStock').value,
             Category: document.getElementById('productCategory').value,
             ImageBase64: imageBase64Input.value,
+            rowNumber: document.getElementById('productRowNumber').value // <-- Send the row number
         };
 
         const endpoint = productData.ProductID ? 'updateProduct' : 'addProduct';
@@ -725,12 +709,18 @@
 
         if (response && response.success) {
             closeProductModal();
-            const savedDbConfig = localStorage.getItem('dbConfig');
-            if(savedDbConfig) {
-                dbConfig = JSON.parse(savedDbConfig);
-                await loadDatabase(); // Re-fetch all data to show changes
-                showView('catalog'); // Ensure catalog is visible after the modal closes
+            if (endpoint === 'addProduct') {
+                await loadDatabase(); // Reload everything on new product
+            } else {
+                // For updates, just modify the local data for speed
+                const index = allProducts.findIndex(p => p.ProductID === productData.ProductID);
+                if (index !== -1) {
+                    // Update the product in our local array
+                    allProducts[index] = { ...allProducts[index], ...productData };
+                }
+                renderProducts(); // Re-render the list without a full network request
             }
+            showView('catalog');
         } else {
             alert(`Error: ${response ? response.message : 'Could not save product.'}`);
         }
