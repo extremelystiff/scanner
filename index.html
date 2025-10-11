@@ -20,24 +20,24 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
         /* More robust scanner view styling */
-        #reader-container {
+        .reader-container {
             position: relative;
             background: black;
             width: 100%;
-            aspect-ratio: 1 / 1; /* Modern CSS for 1:1 Aspect Ratio */
+            aspect-ratio: 1 / 1;
             border-radius: 0.5rem; 
-            overflow: hidden; /* Clips anything trying to render outside */
+            overflow: hidden;
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
         }
-        #reader {
+        .reader-element {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
         }
         /* Target the video element injected by the library */
-        #reader video {
+        .reader-element video {
             width: 100% !important;
             height: 100% !important;
-            object-fit: cover; /* Ensures the video fills the container without distortion */
+            object-fit: cover;
         }
         .scanner-line {
             position: absolute;
@@ -56,15 +56,11 @@
         .modal-backdrop {
             background-color: rgba(0,0,0,0.75);
         }
-        /* Make main containers scrollable if content overflows */
         main {
             padding-bottom: 80px;
             overflow-y: auto;
         }
-        /* Hide scrollbar for cleaner look */
-        main::-webkit-scrollbar {
-            display: none;
-        }
+        main::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -75,11 +71,11 @@
         <!-- =================================================================== -->
         <!-- =================== SCANNER INTERFACE =========================== -->
         <!-- =================================================================== -->
-        <div id="scannerView" class="flex-grow flex-col hidden">
+        <div id="scannerView" class="h-full flex-grow flex-col hidden">
             <!-- Header -->
             <header class="p-3 bg-white shadow-md z-20">
                 <h1 class="text-xl font-bold text-center">Prize Scanner</h1>
-                <button id="connectButton" class="w-full mt-2 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 disabled:bg-gray-400">
+                <button id="connectButton" class="w-full mt-2 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400">
                     Connect to Scanner
                 </button>
                 <div id="bleStatus" class="text-center text-sm text-gray-500 mt-1">Status: Disconnected</div>
@@ -87,8 +83,8 @@
 
             <!-- Main Content -->
             <main class="flex-grow p-4">
-                <div id="reader-container">
-                    <div id="reader"></div>
+                <div id="reader-container" class="reader-container">
+                    <div id="reader" class="reader-element"></div>
                     <div class="scanner-line"></div>
                 </div>
                 <div id="scanResult" class="mt-4 p-3 bg-white rounded-lg text-center font-mono break-words">
@@ -116,11 +112,11 @@
         <!-- =================================================================== -->
         <!-- =================== PRODUCT CATALOG SECTION ===================== -->
         <!-- =================================================================== -->
-        <div id="databaseLoginView" class="p-8 h-full flex flex-col items-center justify-center bg-gray-200">
+        <div id="databaseLoginView" class="h-full p-8 flex flex-col items-center justify-center bg-gray-200">
             <div class="text-center">
                 <h2 class="text-2xl font-bold mb-4">Product Database</h2>
                 <p class="mb-6 text-gray-600">Scan your database encryption key to load the product catalog.</p>
-                <button id="scanDbKeyButton" class="w-full py-3 px-4 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 focus:outline-none">
+                <button id="scanDbKeyButton" class="w-full py-3 px-4 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600">
                     Scan Database Key
                 </button>
                 <div id="dbStatus" class="mt-4 text-sm text-red-500 font-semibold"></div>
@@ -131,24 +127,20 @@
             <!-- Header for Catalog -->
             <header class="p-3 bg-white shadow-md z-10 flex-shrink-0">
                 <div class="flex gap-2">
-                    <input type="text" id="searchInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Search by name, barcode...">
+                    <input type="text" id="searchInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Search by name, barcode...">
                     <button id="addProductButton" class="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex-shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                     </button>
                 </div>
-                <div id="categoryFilters" class="mt-2 flex flex-wrap gap-2">
-                    <!-- Category buttons will be injected here -->
-                </div>
+                <div id="categoryFilters" class="mt-2 flex flex-wrap gap-2"></div>
             </header>
 
             <!-- Product List -->
-            <main id="productList" class="flex-grow p-4 space-y-3 overflow-y-auto">
-                <!-- Product cards will be injected here -->
-            </main>
+            <main id="productList" class="flex-grow p-4 space-y-3 overflow-y-auto"></main>
         </div>
 
         <!-- Shared Session Indicator Bar -->
-        <div id="sessionIndicator" class="fixed top-0 left-0 right-0 bg-yellow-400 text-black p-1 text-center text-sm font-bold flex justify-between items-center z-30 max-w-md mx-auto">
+        <div id="sessionIndicator" class="fixed top-0 left-0 right-0 bg-yellow-400 text-black p-1 text-center text-sm font-bold flex justify-between items-center z-30 max-w-md mx-auto hidden">
             <button id="closeSessionButton" class="bg-red-500 text-white text-xs font-bold py-1 px-2 rounded">CLOSE</button>
             <span>Session: <span id="currentSessionName">None</span></span>
             <button id="changeSessionButton" class="bg-blue-500 text-white text-xs font-bold py-1 px-2 rounded">Change</button>
@@ -158,28 +150,35 @@
     <!-- =================================================================== -->
     <!-- ========================= MODALS ================================== -->
     <!-- =================================================================== -->
-    <div id="sessionModal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-40">
+    <div id="sessionModal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-40 hidden">
         <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12">
-            <h2 class="text-2xl font-bold mb-4 text-center">Select a Session</h2>
+            <h2 class="text-2xl font-bold mb-4 text-center">Select an Action</h2>
             <div class="grid grid-cols-2 gap-4">
-                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION01">Session 1</button>
-                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION02">Session 2</button>
-                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION03">Session 3</button>
-                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION04">Session 4</button>
-                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION05">Session 5</button>
-                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md hover:bg-indigo-600" data-session="OPEN SESSION06">Session 6</button>
+                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md" data-session="OPEN SESSION01">Session 1</button>
+                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md" data-session="OPEN SESSION02">Session 2</button>
+                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md" data-session="OPEN SESSION03">Session 3</button>
+                <button class="session-btn py-4 px-2 bg-indigo-500 text-white font-bold rounded-lg shadow-md" data-session="OPEN SESSION04">Session 4</button>
             </div>
-            <button id="showCatalogButton" class="w-full mt-4 py-3 bg-gray-600 text-white font-bold rounded-lg shadow-md hover:bg-gray-700">View Product Catalog</button>
+            <button id="showCatalogButton" class="w-full mt-4 py-3 bg-gray-600 text-white font-bold rounded-lg shadow-md">View Product Catalog</button>
         </div>
+    </div>
+
+    <!-- NEW: Modal specifically for scanning the database key -->
+    <div id="dbScannerModal" class="fixed inset-0 bg-black z-50 flex-col items-center justify-center hidden">
+        <div id="db-reader-container" class="w-11/12 max-w-md reader-container">
+             <div id="db-reader" class="reader-element"></div>
+        </div>
+        <p class="text-white text-lg mt-4 font-semibold">Scan Database Encryption Key</p>
+        <button id="cancelDbScanButton" class="mt-4 py-2 px-6 bg-red-500 text-white font-bold rounded-lg">Cancel</button>
     </div>
 
     <div id="multiplierModal" class="fixed inset-0 modal-backdrop items-center justify-center z-40 hidden">
         <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12">
-            <h2 class="text-2xl font-bold mb-4 text-center">Set Quantity</h2>
+            <h2 class="text-2xl font-bold mb-4">Set Quantity</h2>
             <input type="number" id="multiplierInput" class="w-full text-4xl text-center p-2 border-2 rounded-lg mb-4" value="1" min="1" max="99">
             <div class="flex gap-4">
-                <button id="cancelMultiplier" class="w-full py-2 bg-gray-500 text-white font-bold rounded-lg hover:bg-gray-600">Cancel</button>
-                <button id="confirmMultiplier" class="w-full py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600">Confirm</button>
+                <button id="cancelMultiplier" class="w-full py-2 bg-gray-500 text-white font-bold rounded-lg">Cancel</button>
+                <button id="confirmMultiplier" class="w-full py-2 bg-green-500 text-white font-bold rounded-lg">Confirm</button>
             </div>
         </div>
     </div>
@@ -189,62 +188,59 @@
             <h2 id="productModalTitle" class="text-2xl font-bold mb-4">Add New Product</h2>
             <form id="productForm">
                 <input type="hidden" id="productId">
-                
                 <div class="mb-4">
                     <label for="productName" class="block text-sm font-medium text-gray-700">Product Name</label>
-                    <input type="text" id="productName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+                    <input type="text" id="productName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" required>
                 </div>
-                
                 <div class="mb-4">
                     <label for="productBarcode" class="block text-sm font-medium text-gray-700">Barcode / SKU</label>
-                     <div class="flex gap-2">
-                        <input type="text" id="productBarcode" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
-                        <!-- In a real app, a scan button here would be complex. For now, manual entry. -->
-                    </div>
+                    <input type="text" id="productBarcode" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
                 </div>
-
                 <div class="mb-4">
                     <label for="productStock" class="block text-sm font-medium text-gray-700">Stock Count</label>
-                    <input type="number" id="productStock" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" value="0" min="0">
+                    <input type="number" id="productStock" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" value="0" min="0">
                 </div>
-
                 <div class="mb-4">
                     <label for="productCategory" class="block text-sm font-medium text-gray-700">Category</label>
-                    <input type="text" id="productCategory" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., Electronics, Toys">
+                    <input type="text" id="productCategory" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="e.g., Electronics, Toys">
                 </div>
-                
                 <div class="mb-4">
                     <label for="productImage" class="block text-sm font-medium text-gray-700">Product Image</label>
-                    <input type="file" id="productImage" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <input type="file" id="productImage" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                     <img id="imagePreview" src="" class="mt-2 h-32 w-32 object-cover rounded-md hidden">
                     <input type="hidden" id="imageBase64">
                 </div>
-
                 <div class="flex gap-4 mt-6">
-                    <button type="button" id="cancelProductForm" class="w-full py-2 bg-gray-500 text-white font-bold rounded-lg hover:bg-gray-600">Cancel</button>
-                    <button type="submit" class="w-full py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600">Save Product</button>
+                    <button type="button" id="cancelProductForm" class="w-full py-2 bg-gray-500 text-white font-bold rounded-lg">Cancel</button>
+                    <button type="submit" class="w-full py-2 bg-green-500 text-white font-bold rounded-lg">Save Product</button>
                 </div>
-                 <button type="button" id="deleteProductButton" class="w-full mt-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 hidden">Delete Product</button>
+                 <button type="button" id="deleteProductButton" class="w-full mt-4 py-2 bg-red-600 text-white font-bold rounded-lg hidden">Delete Product</button>
             </form>
         </div>
     </div>
 
 
     <script>
-        // --- GLOBAL STATE & CONSTANTS ---
+        // --- GLOBAL STATE ---
         let currentSession = null;
         let currentMultiplier = 1;
-        let html5QrCode = null;
+        let prizeScanner = null;
+        let dbScanner = null;
         let isScannerRunning = false;
         let commandCharacteristic = null;
         let audioContext;
         let isScanCooldown = false;
+        let dbConfig = null;
+        let allProducts = [];
+        let allCategories = [];
+        let activeCategory = 'All';
 
+        // --- CONSTANTS ---
         const SERVICE_UUID = "0000180a-0000-1000-8000-00805f9b34fb";
         const COMMAND_CHARACTERISTIC_UUID = "00002a57-0000-1000-8000-00805f9b34fb";
         const STATUS_CHARACTERISTIC_UUID = "00002a58-0000-1000-8000-00805f9b34fb";
         
-        // --- SCANNER DOM REFERENCES ---
+        // --- DOM REFERENCES ---
         const scannerView = document.getElementById('scannerView');
         const connectButton = document.getElementById('connectButton');
         const bleStatus = document.getElementById('bleStatus');
@@ -254,14 +250,7 @@
         const scanResult = document.getElementById('scanResult');
         const multiplierLabel = document.getElementById('multiplierLabel');
         const scanButton = document.getElementById('scanButton');
-
-        // --- DATABASE & CATALOG STATE ---
-        let dbConfig = null; // Will store { url, token }
-        let allProducts = [];
-        let allCategories = [];
-        let activeCategory = 'All';
-
-        // --- DATABASE & CATALOG DOM REFERENCES ---
+        const sessionIndicator = document.getElementById('sessionIndicator');
         const databaseLoginView = document.getElementById('databaseLoginView');
         const productCatalogView = document.getElementById('productCatalogView');
         const dbStatus = document.getElementById('dbStatus');
@@ -269,8 +258,6 @@
         const categoryFilters = document.getElementById('categoryFilters');
         const searchInput = document.getElementById('searchInput');
         const showCatalogButton = document.getElementById('showCatalogButton');
-
-        // Modals and Forms
         const productModal = document.getElementById('productModal');
         const productForm = document.getElementById('productForm');
         const cancelProductForm = document.getElementById('cancelProductForm');
@@ -279,8 +266,12 @@
         const imagePreview = document.getElementById('imagePreview');
         const productImageInput = document.getElementById('productImage');
         const imageBase64Input = document.getElementById('imageBase64');
+        const dbScannerModal = document.getElementById('dbScannerModal');
+        const cancelDbScanButton = document.getElementById('cancelDbScanButton');
+        const scanDbKeyButton = document.getElementById('scanDbKeyButton');
 
-        // --- FEEDBACK FUNCTIONS ---
+
+        // --- FEEDBACK & UTILITY FUNCTIONS ---
         function playBeep() {
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -303,14 +294,15 @@
             }
         }
         
-        // --- CORE LOGIC: VIEW MANAGEMENT ---
         function showView(view) {
             scannerView.style.display = 'none';
             databaseLoginView.style.display = 'none';
             productCatalogView.style.display = 'none';
+            sessionIndicator.style.display = 'none';
 
             if (view === 'scanner') {
                 scannerView.style.display = 'flex';
+                sessionIndicator.style.display = 'flex';
             } else if (view === 'login') {
                 databaseLoginView.style.display = 'flex';
             } else if (view === 'catalog') {
@@ -318,7 +310,7 @@
             }
         }
 
-        // --- CORE LOGIC: BLE ---
+        // --- BLE LOGIC ---
         async function sendBleCommand(command) {
             if (!commandCharacteristic) {
                 bleStatus.textContent = 'Scanner is disconnected.';
@@ -385,7 +377,7 @@
             connectButton.textContent = 'Connect to Scanner';
             commandCharacteristic = null;
             if (isScannerRunning) {
-                stopScanner();
+                stopPrizeScanner();
             }
         }
 
@@ -394,24 +386,18 @@
             bleStatus.textContent = `ESP32: ${statusMessage}`;
         }
 
-        // --- CORE LOGIC: SESSION MANAGEMENT ---
+        // --- SESSION MANAGEMENT ---
         function setSession(sessionCommand) {
             currentSession = sessionCommand;
             const sessionNumber = sessionCommand.slice(-2);
             currentSessionName.textContent = `S${sessionNumber}`;
             sessionModal.style.display = 'none';
-            sendSequence([currentSession]); // Send session command to prime the scanner
-            showView('scanner'); // After selecting a session, show the scanner view
+            sendSequence([currentSession]);
+            showView('scanner');
         }
-
-        document.querySelectorAll('.session-btn').forEach(button => {
-            button.addEventListener('click', () => setSession(button.dataset.session));
-        });
-
-        document.getElementById('changeSessionButton').addEventListener('click', () => {
-            sessionModal.style.display = 'flex';
-        });
-
+        document.querySelectorAll('.session-btn').forEach(button => button.addEventListener('click', () => setSession(button.dataset.session)));
+        document.getElementById('changeSessionButton').addEventListener('click', () => sessionModal.style.display = 'flex');
+        
         document.getElementById('closeSessionButton').addEventListener('click', () => {
             if (!currentSession) {
                 alert('No session is active.');
@@ -420,8 +406,8 @@
             sendSequence(['CLOSE SESSION']);
         });
 
-        // --- CORE LOGIC: CAMERA BARCODE SCANNER ---
-        const onPrizeScanSuccess = (decodedText, decodedResult) => {
+        // --- PRIZE SCANNER LOGIC ---
+        const onPrizeScanSuccess = (decodedText) => {
             if (isScanCooldown) return;
             isScanCooldown = true;
             
@@ -449,56 +435,50 @@
             }, 2000);
         };
         
-        function startScanner() {
-            if (isScannerRunning || !html5QrCode) return;
+        function startPrizeScanner() {
+            if (isScannerRunning || !prizeScanner) return;
             if (!currentSession) {
-                alert("Please select a session before scanning.");
+                alert("Please select a session first.");
                 sessionModal.style.display = 'flex';
                 return;
             }
-
             isScannerRunning = true;
             scanButton.classList.add('text-green-400');
             scanResult.textContent = "Scanning...";
-            html5QrCode.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                onPrizeScanSuccess,
-                (error) => { /* quiet failure */ }
-            ).catch(err => {
-                console.error("Failed to start scanner", err);
+            prizeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onPrizeScanSuccess, (e) => {})
+            .catch(err => {
                 isScannerRunning = false;
                 scanButton.classList.remove('text-green-400');
                 scanResult.textContent = "Error starting camera.";
             });
         }
         
-        function stopScanner() {
-            if (!isScannerRunning || !html5QrCode || html5QrCode.getState() !== 2) return;
-            html5QrCode.stop().finally(() => {
+        function stopPrizeScanner() {
+            if (!isScannerRunning || !prizeScanner || prizeScanner.getState() !== 2) return;
+            prizeScanner.stop().finally(() => {
                 isScannerRunning = false;
                 scanButton.classList.remove('text-green-400');
                 scanResult.textContent = "Hold Scan Button to Scan";
             });
         }
         
-        scanButton.addEventListener('mousedown', startScanner);
-        scanButton.addEventListener('mouseup', stopScanner);
-        scanButton.addEventListener('mouseleave', stopScanner);
-        scanButton.addEventListener('touchstart', (e) => { e.preventDefault(); startScanner(); });
-        scanButton.addEventListener('touchend', stopScanner);
+        scanButton.addEventListener('mousedown', startPrizeScanner);
+        scanButton.addEventListener('mouseup', stopPrizeScanner);
+        scanButton.addEventListener('mouseleave', stopPrizeScanner);
+        scanButton.addEventListener('touchstart', (e) => { e.preventDefault(); startPrizeScanner(); });
+        scanButton.addEventListener('touchend', stopPrizeScanner);
 
-        // --- OTHER UI ACTIONS ---
+        // --- OTHER UI ACTIONS (Prize Scanner) ---
         document.getElementById('redeemButton').addEventListener('click', () => {
-            if (!currentSession) {
+             if (!currentSession) {
                 alert('Please select a session before redeeming.');
                 return;
             }
             sendSequence([currentSession, 'REDEMPTION']);
         });
 
-        document.getElementById('multiplierButton').addEventListener('click', () => { multiplierModal.style.display = 'flex'; });
-        document.getElementById('cancelMultiplier').addEventListener('click', () => { multiplierModal.style.display = 'none'; });
+        document.getElementById('multiplierButton').addEventListener('click', () => multiplierModal.style.display = 'flex');
+        document.getElementById('cancelMultiplier').addEventListener('click', () => multiplierModal.style.display = 'none');
         document.getElementById('confirmMultiplier').addEventListener('click', () => {
             const value = parseInt(document.getElementById('multiplierInput').value, 10);
             currentMultiplier = Math.max(1, value);
@@ -506,7 +486,7 @@
             multiplierModal.style.display = 'none';
         });
 
-        // --- CORE LOGIC: DATABASE AUTHENTICATION & LOADING ---
+        // --- DATABASE AUTH & LOADING LOGIC ---
         async function fetchFromDB(endpoint, options = {}) {
             if (!dbConfig) {
                 console.error("Database is not configured.");
@@ -514,7 +494,6 @@
             }
             const url = new URL(dbConfig.url);
             url.searchParams.append('token', dbConfig.token);
-            // In POST requests, the endpoint is in the body, for GET it's a param
             if (options.method !== 'POST') {
                 url.searchParams.append('endpoint', endpoint);
             }
@@ -542,7 +521,7 @@
                 renderProducts();
                 renderCategories();
                 
-                showView('catalog');
+                sessionModal.style.display = 'flex'; // Show action choice
                 dbStatus.textContent = '';
             } else {
                 dbStatus.textContent = `Failed to load products: ${data ? data.message : 'Network error'}`;
@@ -551,53 +530,43 @@
                 showView('login');
             }
         }
-
+        
         function onDbKeyScanSuccess(decodedText) {
-            try {
-                stopScanner(); // Stop the scanner used for the DB key
-                const url = new URL(decodedText);
-                const token = url.searchParams.get('token');
-                
-                if (!token) {
-                    dbStatus.textContent = 'Invalid Key: No token found.';
-                    return;
+            dbScanner.stop().then(() => {
+                dbScannerModal.style.display = 'none';
+                try {
+                    const url = new URL(decodedText);
+                    const token = url.searchParams.get('token');
+                    if (!token) {
+                        dbStatus.textContent = 'Invalid Key: No token found.';
+                        return;
+                    }
+                    dbConfig = { url: `${url.protocol}//${url.host}${url.pathname}`, token: token };
+                    localStorage.setItem('dbConfig', JSON.stringify(dbConfig));
+                    loadDatabase();
+                } catch (error) {
+                    dbStatus.textContent = 'Invalid QR Code. Must be a valid URL.';
                 }
-
-                dbConfig = {
-                    url: `${url.protocol}//${url.host}${url.pathname}`,
-                    token: token
-                };
-                
-                localStorage.setItem('dbConfig', JSON.stringify(dbConfig));
-                loadDatabase();
-
-            } catch (error) {
-                dbStatus.textContent = 'Invalid QR Code Format. Must be a valid URL.';
-                console.error("DB Key Scan Error:", error);
-            }
+            });
         }
 
-        document.getElementById('scanDbKeyButton').addEventListener('click', () => {
-            if (!html5QrCode) { alert("Scanner not initialized."); return; }
-            scanResult.textContent = "Scanning for Database Key...";
-            dbStatus.textContent = "Point camera at the Database QR Code...";
-            // We need a temporary reader element for this scan
-            const tempReader = document.createElement('div');
-            tempReader.style.display = 'none';
-            document.body.appendChild(tempReader);
-            const tempQrCode = new Html5Qrcode(tempReader.id);
-
-            html5QrCode.start(
-                { facingMode: "environment" },
-                { fps: 5, qrbox: { width: 250, height: 250 } },
-                onDbKeyScanSuccess,
-                (error) => {}
-            ).catch(err => {
-                alert("Could not start camera for DB Key scan.");
+        scanDbKeyButton.addEventListener('click', () => {
+            dbScannerModal.style.display = 'flex';
+            dbScanner.start({ facingMode: "environment" }, { fps: 5, qrbox: { width: 250, height: 250 } }, onDbKeyScanSuccess, (e) => {})
+            .catch(err => {
+                alert("Could not start camera. Please grant permission.");
+                dbScannerModal.style.display = 'none';
             });
         });
 
-        // --- CORE LOGIC: RENDERING & UI ---
+        cancelDbScanButton.addEventListener('click', () => {
+            if (dbScanner && dbScanner.getState() === 2) {
+                dbScanner.stop();
+            }
+            dbScannerModal.style.display = 'none';
+        });
+
+        // --- CATALOG RENDERING & UI ---
         function renderProducts() {
             productList.innerHTML = '';
             const searchTerm = searchInput.value.toLowerCase();
@@ -681,12 +650,14 @@
 
         addProductButton.addEventListener('click', () => openProductModal());
         cancelProductForm.addEventListener('click', closeProductModal);
+        
         showCatalogButton.addEventListener('click', () => {
              if (dbConfig) {
                 sessionModal.style.display = 'none';
                 showView('catalog');
              } else {
-                alert("Please scan the database key first.");
+                alert("Database not loaded. Please scan the database key from the login screen.");
+                sessionModal.style.display = 'none';
                 showView('login');
              }
         });
@@ -716,10 +687,9 @@
             };
 
             const endpoint = productData.ProductID ? 'updateProduct' : 'addProduct';
-            const response = await fetchFromDB(null, { // endpoint is now in the body
+            const response = await fetchFromDB(null, {
                 method: 'POST',
-                // mode: 'no-cors', // Required for simple triggers in Apps Script
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Required for simple triggers
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ endpoint: endpoint, data: productData })
             });
 
@@ -733,7 +703,8 @@
 
         // --- INITIALIZATION ---
         window.addEventListener('DOMContentLoaded', () => {
-            html5QrCode = new Html5Qrcode("reader");
+            prizeScanner = new Html5Qrcode("reader");
+            dbScanner = new Html5Qrcode("db-reader");
 
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('/service-worker.js').catch(err => console.error(err));
@@ -742,10 +713,8 @@
             const savedDbConfig = localStorage.getItem('dbConfig');
             if (savedDbConfig) {
                 dbConfig = JSON.parse(savedDbConfig);
-                sessionModal.style.display = 'flex'; // Show session select first
-                loadDatabase(); // Load in background
+                loadDatabase();
             } else {
-                sessionModal.style.display = 'none';
                 showView('login');
             }
             searchInput.addEventListener('input', renderProducts);
