@@ -767,11 +767,15 @@ function openProductModal(product = null) {
     });
 
     // --- INITIALIZATION ---
+// --- INITIALIZATION ---
     window.addEventListener('DOMContentLoaded', async () => {
         prizeScanner = new Html5Qrcode("reader");
         dbScanner = new Html5Qrcode("db-reader");
 
-        if ('serviceWorker' in navigator) { /* ... register service worker ... */ }
+        // 1. Restored Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js').catch(err => console.error('Service Worker registration failed:', err));
+        }
         
         await initDB(); // IMPORTANT: Initialize the database on load
 
@@ -779,7 +783,7 @@ function openProductModal(product = null) {
         if (savedDbConfig) {
             dbConfig = JSON.parse(savedDbConfig);
             
-            // Load local data first for instant UI
+            // This is the robust, offline-first loading logic
             const localProducts = await dbGetAll(PRODUCT_STORE_NAME);
             if (localProducts && localProducts.length > 0) {
                 allProducts = localProducts;
@@ -789,12 +793,15 @@ function openProductModal(product = null) {
             } else {
                 // No local data, must fetch from server
                 dbStatus.textContent = "No local data found. Fetching from server...";
-                syncDatabase();
+                loadDatabase(); 
             }
         } else {
             showView('login');
         }
+        
         searchInput.addEventListener('input', renderProducts);
+        
+        // 2. Added the missing event listener for the camera button
         backToScannerButton.addEventListener('click', () => showView('scanner'));
     });
 </script>
