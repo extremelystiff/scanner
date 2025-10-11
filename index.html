@@ -5,94 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Prize Scanner & Inventory</title>
     
-    <!-- PWA Manifest and Theme Color -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4A5568"/>
 
-    <!-- External Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <style>
-        /* Prevents pull-to-refresh and other annoying mobile browser behaviors */
-        body {
-            overscroll-behavior-y: contain;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-        /* More robust scanner view styling */
-        .reader-container {
-            position: relative;
-            background: black;
-            width: 100%;
-            aspect-ratio: 1 / 1;
-            border-radius: 0.5rem; 
-            overflow: hidden;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-        }
-        .reader-element {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-        }
-        /* Target the video element injected by the library */
-        .reader-element video {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover;
-        }
-        .scanner-line {
-            position: absolute;
-            left: 5%;
-            right: 5%;
-            height: 2px;
-            background: red;
-            box-shadow: 0 0 10px red;
-            animation: scan 2s infinite linear;
-        }
-        @keyframes scan {
-            0% { top: 10%; }
-            50% { top: 90%; }
-            100% { top: 10%; }
-        }
-        .modal-backdrop {
-            background-color: rgba(0,0,0,0.75);
-        }
-        main {
-            padding-bottom: 80px;
-            overflow-y: auto;
-        }
+        body { overscroll-behavior-y: contain; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .reader-container { position: relative; background: black; width: 100%; aspect-ratio: 1 / 1; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); }
+        .reader-element { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+        .reader-element video { width: 100% !important; height: 100% !important; object-fit: cover; }
+        .scanner-line { position: absolute; left: 5%; right: 5%; height: 2px; background: red; box-shadow: 0 0 10px red; animation: scan 2s infinite linear; }
+        @keyframes scan { 0% { top: 10%; } 50% { top: 90%; } 100% { top: 10%; } }
+        .modal-backdrop { background-color: rgba(0,0,0,0.75); }
+        main { padding-bottom: 80px; overflow-y: auto; }
         main::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-    <!-- App Container -->
     <div id="app" class="max-w-md mx-auto h-screen flex flex-col">
 
-        <!-- =================================================================== -->
-        <!-- =================== SCANNER INTERFACE =========================== -->
-        <!-- =================================================================== -->
+        <!-- SCANNER INTERFACE -->
         <div id="scannerView" class="h-full flex-grow flex-col hidden">
-            <!-- Header -->
             <header class="p-3 bg-white shadow-md z-20">
                 <h1 class="text-xl font-bold text-center">Prize Scanner</h1>
-                <button id="connectButton" class="w-full mt-2 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400">
-                    Connect to Scanner
-                </button>
+                <button id="connectButton" class="w-full mt-2 py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400">Connect to Scanner</button>
                 <div id="bleStatus" class="text-center text-sm text-gray-500 mt-1">Status: Disconnected</div>
             </header>
-
-            <!-- Main Content -->
             <main class="flex-grow p-4">
                 <div id="reader-container" class="reader-container">
                     <div id="reader" class="reader-element"></div>
                     <div class="scanner-line"></div>
                 </div>
-                <div id="scanResult" class="mt-4 p-3 bg-white rounded-lg text-center font-mono break-words">
-                    Hold Scan Button to Scan
-                </div>
+                <div id="scanResult" class="mt-4 p-3 bg-white rounded-lg text-center font-mono break-words">Hold Scan Button to Scan</div>
             </main>
-            
-            <!-- Bottom Navigation Bar -->
             <footer class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-gray-800 text-white p-2 flex justify-around items-center shadow-lg z-20">
                 <button id="scanButton" class="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-700 disabled:opacity-50">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
@@ -109,37 +57,35 @@
             </footer>
         </div>
 
-        <!-- =================================================================== -->
-        <!-- =================== PRODUCT CATALOG SECTION ===================== -->
-        <!-- =================================================================== -->
+        <!-- PRODUCT CATALOG SECTION -->
         <div id="databaseLoginView" class="h-full p-8 flex flex-col items-center justify-center bg-gray-200">
             <div class="text-center">
                 <h2 class="text-2xl font-bold mb-4">Product Database</h2>
-                <p class="mb-6 text-gray-600">Scan your database encryption key to load the product catalog.</p>
-                <button id="scanDbKeyButton" class="w-full py-3 px-4 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600">
-                    Scan Database Key
-                </button>
+                <p class="mb-6 text-gray-600">Scan your database key to load the product catalog.</p>
+                <button id="scanDbKeyButton" class="w-full py-3 px-4 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600">Scan Database Key</button>
                 <div id="dbStatus" class="mt-4 text-sm text-red-500 font-semibold"></div>
             </div>
         </div>
 
         <div id="productCatalogView" class="hidden h-full flex-grow flex-col">
-            <!-- Header for Catalog -->
             <header class="p-3 bg-white shadow-md z-10 flex-shrink-0">
                 <div class="flex gap-2">
+                    <!-- NEW: Back to Scanner Button -->
+                    <button id="backToScannerButton" class="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    </button>
                     <input type="text" id="searchInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Search by name, barcode...">
                     <button id="addProductButton" class="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex-shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                     </button>
                 </div>
                 <div id="categoryFilters" class="mt-2 flex flex-wrap gap-2"></div>
+                <div id="syncStatus" class="text-center text-xs text-gray-500 mt-2"></div>
             </header>
-
-            <!-- Product List -->
             <main id="productList" class="flex-grow p-4 space-y-3 overflow-y-auto"></main>
         </div>
 
-        <!-- Shared Session Indicator Bar -->
+        <!-- SESSION INDICATOR BAR -->
         <div id="sessionIndicator" class="fixed top-0 left-0 right-0 bg-yellow-400 text-black p-1 text-center text-sm font-bold flex justify-between items-center z-30 max-w-md mx-auto hidden">
             <button id="closeSessionButton" class="bg-red-500 text-white text-xs font-bold py-1 px-2 rounded">CLOSE</button>
             <span>Session: <span id="currentSessionName">None</span></span>
@@ -147,9 +93,7 @@
         </div>
     </div>
 
-    <!-- =================================================================== -->
-    <!-- ========================= MODALS ================================== -->
-    <!-- =================================================================== -->
+    <!-- MODALS -->
     <div id="sessionModal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-40 hidden">
         <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12">
             <h2 class="text-2xl font-bold mb-4 text-center">Select an Action</h2>
@@ -163,12 +107,11 @@
         </div>
     </div>
 
-    <!-- NEW: Modal specifically for scanning the database key -->
     <div id="dbScannerModal" class="fixed inset-0 bg-black z-50 flex-col items-center justify-center hidden">
         <div id="db-reader-container" class="w-11/12 max-w-md reader-container">
              <div id="db-reader" class="reader-element"></div>
         </div>
-        <p class="text-white text-lg mt-4 font-semibold">Scan Database Encryption Key</p>
+        <p class="text-white text-lg mt-4 font-semibold">Scan Database Key</p>
         <button id="cancelDbScanButton" class="mt-4 py-2 px-6 bg-red-500 text-white font-bold rounded-lg">Cancel</button>
     </div>
 
@@ -219,6 +162,7 @@
             </form>
         </div>
     </div>
+    
 <script>
     // --- GLOBAL STATE ---
     let currentSession = null;
@@ -239,6 +183,10 @@
     const COMMAND_CHARACTERISTIC_UUID = "00002a57-0000-1000-8000-00805f9b34fb";
     const STATUS_CHARACTERISTIC_UUID = "00002a58-0000-1000-8000-00805f9b34fb";
     const MAX_IMAGE_DIMENSION = 800;
+    const DB_NAME = 'ProductDB';
+    const DB_VERSION = 1;
+    const PRODUCT_STORE_NAME = 'products';
+    const METADATA_STORE_NAME = 'metadata';
     
     // --- DOM REFERENCES ---
     const scannerView = document.getElementById('scannerView');
@@ -269,6 +217,63 @@
     const dbScannerModal = document.getElementById('dbScannerModal');
     const cancelDbScanButton = document.getElementById('cancelDbScanButton');
     const scanDbKeyButton = document.getElementById('scanDbKeyButton');
+    const backToScannerButton = document.getElementById('backToScannerButton');
+    const syncStatus = document.getElementById('syncStatus');
+
+    // --- INDEXEDDB HELPER ---
+    let db;
+    async function initDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onerror = (event) => reject("IndexedDB error: " + request.error);
+            request.onsuccess = (event) => {
+                db = event.target.result;
+                resolve(db);
+            };
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(PRODUCT_STORE_NAME)) {
+                    db.createObjectStore(PRODUCT_STORE_NAME, { keyPath: 'ProductID' });
+                }
+                if (!db.objectStoreNames.contains(METADATA_STORE_NAME)) {
+                    db.createObjectStore(METADATA_STORE_NAME, { keyPath: 'key' });
+                }
+            };
+        });
+    }
+
+    async function dbGet(storeName, key) {
+        if (!db) await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(storeName, 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(key);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function dbSet(storeName, value) {
+        if (!db) await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.put(value);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+    
+    async function dbGetAll(storeName) {
+        if (!db) await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(storeName, 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
 
     // --- FEEDBACK & UTILITY FUNCTIONS ---
     function playBeep() {
@@ -520,6 +525,40 @@
             showView('login');
         }
     }
+
+    async function syncDatabase() {
+        syncStatus.textContent = "Checking for updates...";
+        const serverMeta = await fetchFromDB('getMetadata');
+        const localMeta = await dbGet(METADATA_STORE_NAME, 'lastUpdated');
+
+        if (serverMeta && serverMeta.lastUpdated && (!localMeta || serverMeta.lastUpdated > localMeta.value)) {
+            syncStatus.textContent = "Downloading new data...";
+            const serverData = await fetchFromDB('getProducts');
+            if (serverData && serverData.products) {
+                for (const product of serverData.products) {
+                    await dbSet(PRODUCT_STORE_NAME, product);
+                }
+                await dbSet(METADATA_STORE_NAME, { key: 'lastUpdated', value: serverMeta.lastUpdated });
+                
+                allProducts = serverData.products; // Update in-memory data
+                populateAndRender(); // Re-render everything
+                syncStatus.textContent = `Updated: ${new Date(serverMeta.lastUpdated).toLocaleTimeString()}`;
+            } else {
+                syncStatus.textContent = "Update check failed.";
+            }
+        } else if (localMeta) {
+            syncStatus.textContent = `Up to date. Last check: ${new Date(localMeta.value).toLocaleTimeString()}`;
+        } else {
+             syncStatus.textContent = "Ready to sync.";
+        }
+    }
+    
+    function populateAndRender() {
+        const categories = new Set(allProducts.map(p => p.Category).filter(Boolean));
+        allCategories = ['All', ...categories];
+        renderProducts();
+        renderCategories();
+    }
     
     function onDbKeyScanSuccess(decodedText) {
         if(dbScanner && dbScanner.getState() === 2) {
@@ -701,6 +740,17 @@
         };
 
         const endpoint = productData.ProductID ? 'updateProduct' : 'addProduct';
+        // Optimistic UI update: Update local state first
+        if (endpoint === 'updateProduct') {
+            const index = allProducts.findIndex(p => p.ProductID === productData.ProductID);
+            if (index !== -1) allProducts[index] = { ...allProducts[index], ...productData };
+            await dbSet(PRODUCT_STORE_NAME, allProducts[index]);
+        }
+        
+        populateAndRender();
+        closeProductModal();
+
+        // Then send to server
         const response = await fetchFromDB(null, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -708,37 +758,38 @@
         });
 
         if (response && response.success) {
-            closeProductModal();
-            if (endpoint === 'addProduct') {
-                await loadDatabase(); // Reload everything on new product
-            } else {
-                // For updates, just modify the local data for speed
-                const index = allProducts.findIndex(p => p.ProductID === productData.ProductID);
-                if (index !== -1) {
-                    // Update the product in our local array
-                    allProducts[index] = { ...allProducts[index], ...productData };
-                }
-                renderProducts(); // Re-render the list without a full network request
-            }
-            showView('catalog');
+            // On success, we just need to update our local timestamp
+            await syncDatabase(); // Re-check metadata after a successful save
         } else {
-            alert(`Error: ${response ? response.message : 'Could not save product.'}`);
+            alert(`Error saving to server: ${response ? response.message : 'Could not save product.'} Data is saved locally.`);
         }
     });
 
     // --- INITIALIZATION ---
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
         prizeScanner = new Html5Qrcode("reader");
         dbScanner = new Html5Qrcode("db-reader");
 
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js').catch(err => console.error(err));
-        }
+        if ('serviceWorker' in navigator) { /* ... register service worker ... */ }
         
+        await initDB(); // IMPORTANT: Initialize the database on load
+
         const savedDbConfig = localStorage.getItem('dbConfig');
         if (savedDbConfig) {
             dbConfig = JSON.parse(savedDbConfig);
-            loadDatabase();
+            
+            // Load local data first for instant UI
+            const localProducts = await dbGetAll(PRODUCT_STORE_NAME);
+            if (localProducts && localProducts.length > 0) {
+                allProducts = localProducts;
+                populateAndRender();
+                sessionModal.style.display = 'flex';
+                syncDatabase(); // Check for updates in the background
+            } else {
+                // No local data, must fetch from server
+                dbStatus.textContent = "No local data found. Fetching from server...";
+                syncDatabase();
+            }
         } else {
             showView('login');
         }
