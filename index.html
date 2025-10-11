@@ -795,6 +795,7 @@ function openProductModal(product = null) {
             showView('login');
         }
         searchInput.addEventListener('input', renderProducts);
+        backToScannerButton.addEventListener('click', () => showView('scanner'));
     });
 </script>
 </body>
