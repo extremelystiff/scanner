@@ -10,6 +10,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 
     <style>
         body { overscroll-behavior-y: contain; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -527,29 +528,56 @@
     }
 
     async function syncDatabase() {
-        syncStatus.textContent = "Checking for updates...";
-        const serverMeta = await fetchFromDB('getMetadata');
-        const localMeta = await dbGet(METADATA_STORE_NAME, 'lastUpdated');
+        if (!dbConfig) return;
 
-        if (serverMeta && serverMeta.lastUpdated && (!localMeta || serverMeta.lastUpdated > localMeta.value)) {
-            syncStatus.textContent = "Downloading new data...";
-            const serverData = await fetchFromDB('getProducts');
-            if (serverData && serverData.products) {
-                for (const product of serverData.products) {
-                    await dbSet(PRODUCT_STORE_NAME, product);
-                }
-                await dbSet(METADATA_STORE_NAME, { key: 'lastUpdated', value: serverMeta.lastUpdated });
-                
-                allProducts = serverData.products; // Update in-memory data
-                populateAndRender(); // Re-render everything
-                syncStatus.textContent = `Updated: ${new Date(serverMeta.lastUpdated).toLocaleTimeString()}`;
-            } else {
-                syncStatus.textContent = "Update check failed.";
+        syncStatus.textContent = "Checking for updates...";
+        const localMeta = await dbGet(METADATA_STORE_NAME, 'lastUpdated');
+        
+        // If we've synced before, use that timestamp. Otherwise, use a very old date to get all changes.
+        const lastSyncTime = localMeta ? localMeta.value : '1970-01-01T00:00:00.000Z';
+
+        // Call the new, efficient 'getChanges' endpoint.
+        const result = await fetchFromDB(`getChanges&since=${encodeURIComponent(lastSyncTime)}`);
+
+        if (result && result.success) {
+            // If the server reports no new changes, we're done.
+            if (result.changes.length === 0 && (result.deleted || []).length === 0) {
+                syncStatus.textContent = `Up to date. Last check: ${new Date().toLocaleTimeString()}`;
+                return;
             }
-        } else if (localMeta) {
-            syncStatus.textContent = `Up to date. Last check: ${new Date(localMeta.value).toLocaleTimeString()}`;
+
+            syncStatus.textContent = `Syncing ${result.changes.length} updates...`;
+
+            // Use a single IndexedDB transaction for performance.
+            const transaction = db.transaction(PRODUCT_STORE_NAME, 'readwrite');
+            const store = transaction.objectStore(PRODUCT_STORE_NAME);
+
+            // Apply all updates/creations
+            for (const product of result.changes) {
+                store.put(product);
+            }
+            
+
+            if (result.deleted) {
+                 for (const productId of result.deleted) {
+                    store.delete(productId);
+                }
+            }
+            
+            // Wait for the database transaction to complete successfully.
+            await new Promise(resolve => transaction.oncomplete = resolve);
+
+            // IMPORTANT: Update our local 'lastUpdated' timestamp to match the server's.
+            await dbSet(METADATA_STORE_NAME, { key: 'lastUpdated', value: result.lastUpdated });
+            
+            // Refresh the in-memory product list from our newly updated local database.
+            allProducts = await dbGetAll(PRODUCT_STORE_NAME);
+            populateAndRender(); // Re-render the UI with the fresh data.
+            
+            syncStatus.textContent = `Sync complete! Updated: ${new Date(result.lastUpdated).toLocaleTimeString()}`;
+
         } else {
-             syncStatus.textContent = "Ready to sync.";
+            syncStatus.textContent = "Update check failed. Using local data.";
         }
     }
     
@@ -615,7 +643,8 @@
                 const card = document.createElement('div');
                 card.className = 'bg-white p-3 rounded-lg shadow flex items-center gap-4 cursor-pointer hover:bg-gray-50';
                 card.innerHTML = `
-                    <img src="${product.ImageBase64 || 'https://via.placeholder.com/80'}" class="w-20 h-20 object-cover rounded-md bg-gray-200">
+                    <!-- MODIFIED: Use ImageURL and add lazy loading -->
+                    <img src="${product.ImageURL || 'https://via.placeholder.com/80'}" class="w-20 h-20 object-cover rounded-md bg-gray-200" loading="lazy">
                     <div class="flex-grow">
                         <h3 class="font-bold text-lg">${product.ProductName}</h3>
                         <p class="text-sm text-gray-600">${product.Barcode || 'No Barcode'}</p>
@@ -662,16 +691,19 @@ function openProductModal(product = null) {
             document.getElementById('productBarcode').value = product.Barcode;
             document.getElementById('productStock').value = product.StockCount;
             document.getElementById('productCategory').value = product.Category;
-            if (product.ImageBase64) {
-                imagePreview.src = product.ImageBase64;
+            if (product.ImageURL) {
+                imagePreview.src = product.ImageURL;
                 imagePreview.classList.remove('hidden');
-                imageBase64Input.value = product.ImageBase64;
             }
+            // We pass the existing ImageURL along in a hidden input so we don't lose it if no new image is selected
+            document.getElementById('productForm').dataset.existingImageUrl = product.ImageURL || '';
+            
             deleteProductButton.classList.remove('hidden');
         } else {
             document.getElementById('productModalTitle').textContent = 'Add New Product';
             document.getElementById('productId').value = ''; // <-- ADD THIS LINE
             document.getElementById('productRowNumber').value = ''; // Clear for new products
+            document.getElementById('productForm').dataset.existingImageUrl = '';
         }
         productModal.style.display = 'flex';
     }
@@ -736,8 +768,9 @@ function openProductModal(product = null) {
             Barcode: document.getElementById('productBarcode').value,
             StockCount: document.getElementById('productStock').value,
             Category: document.getElementById('productCategory').value,
-            ImageBase64: imageBase64Input.value,
-            rowNumber: document.getElementById('productRowNumber').value // <-- Send the row number
+            ImageBase64: imageBase64Input.value, // This is ONLY populated if a new file is chosen
+            ImageURL: document.getElementById('productForm').dataset.existingImageUrl, // Pass existing URL
+            rowNumber: document.getElementById('productRowNumber').value
         };
 
         const endpoint = productData.ProductID ? 'updateProduct' : 'addProduct';
@@ -759,12 +792,11 @@ function openProductModal(product = null) {
         });
 
         if (response && response.success) {
-            // On success, we just need to update our local timestamp
-            await syncDatabase(); // Re-check metadata after a successful save
+            await syncDatabase(); // Re-check for changes
         } else {
             alert(`Error saving to server: ${response ? response.message : 'Could not save product.'} Data is saved locally.`);
         }
-    });
+    }); 
 
     // --- INITIALIZATION ---
 // --- INITIALIZATION ---
@@ -772,38 +804,94 @@ function openProductModal(product = null) {
         prizeScanner = new Html5Qrcode("reader");
         dbScanner = new Html5Qrcode("db-reader");
 
-        // 1. Restored Service Worker Registration
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/service-worker.js').catch(err => console.error('Service Worker registration failed:', err));
         }
         
-        await initDB(); // IMPORTANT: Initialize the database on load
+        await initDB(); 
 
         const savedDbConfig = localStorage.getItem('dbConfig');
         if (savedDbConfig) {
             dbConfig = JSON.parse(savedDbConfig);
             
-            // This is the robust, offline-first loading logic
             const localProducts = await dbGetAll(PRODUCT_STORE_NAME);
+            
             if (localProducts && localProducts.length > 0) {
+                // --- PATH A: RETURNING USER ---
+                // Data exists locally, so the app can start instantly.
+                console.log("Found local data. Loading from IndexedDB for offline-first experience.");
+                
                 allProducts = localProducts;
                 populateAndRender();
                 sessionModal.style.display = 'flex';
-                syncDatabase(); // Check for updates in the background
+                
+                // Check for any small changes in the background.
+                syncDatabase(); 
+                
             } else {
-                // No local data, must fetch from server
-                dbStatus.textContent = "No local data found. Fetching from server...";
-                loadDatabase(); 
+                // --- PATH B: NEW USER ---
+                // No local data found. Perform the one-time compressed bulk download.
+                console.log("No local data. Performing initial compressed bulk download.");
+                dbStatus.textContent = "Downloading database...";
+                showView('login');
+
+                const url = `${dbConfig.url}?token=${dbConfig.token}&endpoint=getBulkDataCompressed`;
+                const response = await fetch(url);
+
+                if (response.ok) {
+                    const base64Data = await response.text();
+                    try {
+                        // Decode the Base64 string back to binary data
+                        const binaryString = window.atob(base64Data);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+
+                        // Decompress the binary data with Pako.js into a JSON string
+                        const decompressedJson = pako.inflate(bytes, { to: 'string' });
+                        
+                        // Parse the JSON string into a usable object
+                        const bulkData = JSON.parse(decompressedJson);
+
+                        if (bulkData.success) {
+                            dbStatus.textContent = `Download complete. Saving ${bulkData.products.length} products...`;
+                            
+                            const transaction = db.transaction(PRODUCT_STORE_NAME, 'readwrite');
+                            const store = transaction.objectStore(PRODUCT_STORE_NAME);
+                            bulkData.products.forEach(product => store.put(product));
+                            
+                            await new Promise(resolve => transaction.oncomplete = resolve);
+
+                            // Save the server's timestamp so our next sync knows where we left off.
+                            await dbSet(METADATA_STORE_NAME, { key: 'lastUpdated', value: bulkData.lastUpdated });
+                            
+                            // Load data into the app and render the UI.
+                            allProducts = bulkData.products;
+                            populateAndRender();
+                            sessionModal.style.display = 'flex';
+                            dbStatus.textContent = ''; // Clear status message
+
+                        } else {
+                             dbStatus.textContent = `Error in database file: ${bulkData.message || 'Unknown error'}`;
+                        }
+                    } catch (e) {
+                         console.error("Failed to decompress or parse database:", e);
+                         dbStatus.textContent = "Error processing database file.";
+                    }
+                } else {
+                    dbStatus.textContent = `Failed to download initial database. Server responded with status ${response.status}.`;
+                }
             }
         } else {
+            // No database configuration found, show the QR code scanner login.
             showView('login');
         }
         
         searchInput.addEventListener('input', renderProducts);
-        
-        // 2. Added the missing event listener for the camera button
         backToScannerButton.addEventListener('click', () => showView('scanner'));
     });
+
 </script>
 </body>
 </html>
